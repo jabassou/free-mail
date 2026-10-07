@@ -42,15 +42,19 @@ import android.view.View
 import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
 
-/** The app = the existing web UI in a WebView, served by the in-process Python backend. */
 private const val LOCK_GRACE_MS = 30_000L // switching apps briefly does not ask again
+private const val OPEN_COMPOSE_JS =
+    "(function(){var t=window.FMAndroid&&FMAndroid.takeComposeTo();location.hash='compose'+(t?'&to='+encodeURIComponent(t):'')})()"
 
+/** The app = the existing web UI in a WebView, served by the in-process Python backend. */
 class MainActivity : ComponentActivity() {
     private lateinit var web: WebView
     private lateinit var splash: SplashView
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var loaded = false
     private var pendingHash: String? = null
+    /** mailto: address handed to the page through FMAndroid.takeComposeTo(), never inlined in JavaScript. */
+    @Volatile private var composeTo: String? = null
     private var pageReady = false
     private lateinit var content: FrameLayout
     private lateinit var lockView: LockView
@@ -143,12 +147,16 @@ class MainActivity : ComponentActivity() {
     /** Notification extras / mailto: intents -> deep link understood by index.html. */
     private fun hashFor(intent: Intent?): String {
         if (intent == null) return ""
-        intent.getStringExtra("folder")?.let { f ->
-            val uid = intent.getStringExtra("uid")
+        // extras can come from any app (the activity is exported for mailto:): validate before use
+        intent.getStringExtra("folder")?.takeIf { it.isNotBlank() && it.length <= 200 }?.let { f ->
+            val uid = intent.getStringExtra("uid")?.takeIf { it.matches(Regex("\\d{1,10}")) }
             return "#m=" + Uri.encode(f) + (if (uid != null) "&u=$uid" else "")
         }
         val data = intent.data
-        if (data?.scheme == "mailto") return "#compose&to=" + Uri.encode(data.schemeSpecificPart.substringBefore('?'))
+        if (data?.scheme == "mailto") {
+            val to = data.schemeSpecificPart.substringBefore('?').trim()
+            return if (android.util.Patterns.EMAIL_ADDRESS.matcher(to).matches()) "#compose&to=" + Uri.encode(to) else "#compose"
+        }
         return ""
     }
 
@@ -232,7 +240,9 @@ class MainActivity : ComponentActivity() {
 
     private fun openExternal(uri: Uri) {
         if (uri.scheme == "mailto") {
-            web.evaluateJavascript("location.hash=" + JSONObject.quote("compose&to=" + Uri.encode(uri.schemeSpecificPart.substringBefore('?'))), null)
+            val to = uri.schemeSpecificPart.substringBefore('?').trim()
+            composeTo = if (android.util.Patterns.EMAIL_ADDRESS.matcher(to).matches()) to else ""
+            web.evaluateJavascript(OPEN_COMPOSE_JS, null)
             return
         }
         try {
@@ -352,6 +362,10 @@ class MainActivity : ComponentActivity() {
 
     /** Exposed to index.html as window.FMAndroid (only our 127.0.0.1 page runs scripts). */
     inner class JsApi {
+        /** One-shot read of the address from the last mailto: link (see openExternal). */
+        @JavascriptInterface
+        fun takeComposeTo(): String = (composeTo ?: "").also { composeTo = null }
+
         /** Web theme changed: match the window background (behind the navigation bar) and the bar icons. */
         @JavascriptInterface
         fun setDark(dark: Boolean) = runOnUiThread {

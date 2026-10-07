@@ -15,6 +15,8 @@ import androidx.core.app.RemoteInput
 /** Restart the watcher after a reboot or an app update. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
+        // exported for the system broadcasts only: ignore anything else another app could send
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         if (Prefs(ctx).configured(ctx)) MailService.start(ctx)
     }
 }

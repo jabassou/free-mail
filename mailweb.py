@@ -314,7 +314,7 @@ def _fetch_raw(mb: fm.Mailbox, uid: str) -> tuple[bytes, list[str]]:
 
 
 def _clean_html(h: str) -> str:
-    h = re.sub(r"(?is)<script\b[^>]*>.*?</script\s*>", "", h)
+    h = re.sub(r"(?is)<script\b.*?(?:</script\b[^>]*>|\Z)", "", h)  # also "</script foo>" and unclosed tags
     h = re.sub(r"(?is)<(iframe|object|embed|form|base|meta[^>]+http-equiv)[^>]*>", "", h)
     h = re.sub(r'(?i)\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)', "", h)
     h = re.sub(r'(?i)(href|src)\s*=\s*(["\']?)\s*javascript:', r"\1=\2#", h)
