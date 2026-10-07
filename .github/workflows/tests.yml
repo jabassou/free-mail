@@ -16,6 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
@@ -33,7 +35,7 @@ jobs:
 
       - name: Python dependencies
         run: |
-          pip install -r requirements.txt -r tests/requirements.txt
+          pip install --require-hashes -r tests/requirements-ci.txt
           python -m playwright install --with-deps chromium
 
       - name: Tests

@@ -1,0 +1,4 @@
+# Pinned, hash-checked install for CI. Regenerate after changing the requirements:
+#   uv pip compile tests/requirements-ci.in --python-version 3.12 --python-platform linux --generate-hashes -o tests/requirements-ci.txt
+-r ../requirements.txt
+-r requirements.txt
