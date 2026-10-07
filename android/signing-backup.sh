@@ -5,7 +5,7 @@
 #   ./signing-backup.sh --github        + secrets ANDROID_KEYSTORE_* du dépôt courant (gh CLI)
 set -euo pipefail
 cd "$(dirname "$0")"
-P=signing/keystore.properties
+P="$PWD/signing/keystore.properties"
 [ -f "$P" ] || { echo "Pas encore de clé : lance ./build-apk.sh une première fois." >&2; exit 1; }
 get(){ sed -n "s/^$1=//p" "$P"; }
 
