@@ -188,3 +188,7 @@ mkdir -p .github/workflows && cp ci/*.yml .github/workflows/
 ```bash
 echo 1.4.1 > VERSION && git commit -am "Release 1.4.1" && git tag v1.4.1 && git push --follow-tags
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE).
