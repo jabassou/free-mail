@@ -259,7 +259,7 @@ def _parse_list_fetch(data) -> list[dict]:
     return out
 
 
-def list_messages(mb: fm.Mailbox, folder: str, page: int = 0, q: str = "", filt: str = "") -> dict:
+def list_messages(mb: fm.Mailbox, folder: str, page: int = 0, q: str = "", filt: str = "", body: bool = False) -> dict:
     raw = mb.resolve(folder)
     total_in_folder = mb.select(raw)
     crit = []
@@ -274,7 +274,7 @@ def list_messages(mb: fm.Mailbox, folder: str, page: int = 0, q: str = "", filt:
     if q:
         if q.isascii():
             qs = _quote_search(q)
-            crit.append(f"OR OR FROM {qs} SUBJECT {qs} TO {qs}")
+            crit.append(f"OR OR OR FROM {qs} SUBJECT {qs} TO {qs} BODY {qs}" if body else f"OR OR FROM {qs} SUBJECT {qs} TO {qs}")
         else:
             literal = q.encode("utf-8")
     crit_s = " ".join(crit) or "ALL"
