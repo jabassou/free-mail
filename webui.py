@@ -14,6 +14,7 @@ import base64
 import datetime as dt
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -39,9 +40,17 @@ extras.init(lambda: ROOT)  # ROOT is re-pointed to the app's files dir on Androi
 APP_VERSION = (ROOT / "VERSION").read_text().strip() if (ROOT / "VERSION").exists() else "dev"
 STATE: dict = {"cookie": None, "user": None, "cfg": None, "imap": False, "notifier": None}
 LAST_VISIBLE = [0.0]  # last poll from a visible UI page (silences phone notifications)
-STATIC = {"/manifest.webmanifest": "application/manifest+json", "/sw.js": "text/javascript; charset=utf-8",
-          "/icons/icon-192.png": "image/png", "/icons/icon-512.png": "image/png", "/icons/maskable-512.png": "image/png",
-          "/icons/badge-96.png": "image/png", "/offline.html": "text/html; charset=utf-8"}
+# URL -> (file under web/, content type). Only these files are served: the URL is a lookup key, never a path.
+STATIC = {
+    "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+    "/sw.js": ("sw.js", "text/javascript; charset=utf-8"),
+    "/vendor/chart.umd.min.js": ("vendor/chart.umd.min.js", "text/javascript; charset=utf-8"),
+    "/icons/icon-192.png": ("icons/icon-192.png", "image/png"),
+    "/icons/icon-512.png": ("icons/icon-512.png", "image/png"),
+    "/icons/maskable-512.png": ("icons/maskable-512.png", "image/png"),
+    "/icons/badge-96.png": ("icons/badge-96.png", "image/png"),
+    "/offline.html": ("offline.html", "text/html; charset=utf-8"),
+}
 JOBS: dict[str, "Job"] = {}
 PLANS: dict[str, dict] = {}
 IMAP_LOCK = threading.Lock()  # one mutating IMAP operation at a time
@@ -602,7 +611,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8", {"Cache-Control": "no-cache"})
         if method == "GET" and url.path in STATIC:
             extra = {"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"} if url.path == "/sw.js" else {"Cache-Control": "max-age=86400"}
-            return self._send(200, (WEB / url.path.lstrip("/")).read_bytes(), STATIC[url.path], extra)
+            fname, ctype = STATIC[url.path]
+            return self._send(200, (WEB / fname).read_bytes(), ctype, extra)
         if not url.path.startswith("/api/"):
             return self._send(404, {"error": "not found"})
         if not secrets.compare_digest(self.headers.get("X-Token", ""), TOKEN):
@@ -1002,9 +1012,11 @@ class Handler(BaseHTTPRequestHandler):
         return next((r for r in get_rules() if r["name"] == a.get("name")), None)
 
     def api_post_filters_restore(self, a):
-        name = Path(a.get("backup", "")).name
-        p = fm.BACKUPS / name
-        if not p.exists():
+        name = str(a.get("backup", ""))
+        if not re.fullmatch(r"filters-[\w.-]+\.json", name):
+            raise ApiError(400, "nom de sauvegarde invalide")
+        p = (fm.BACKUPS / name).resolve()
+        if p.parent != fm.BACKUPS.resolve() or not p.exists():
             raise ApiError(404, "sauvegarde introuvable")
         rules = json.loads(p.read_text())
         return self._mutate(lambda _: rules, "restore")
