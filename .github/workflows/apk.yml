@@ -26,8 +26,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: android-actions/setup-android@v3
-
       - uses: actions/cache@v4
         with:
           path: |
