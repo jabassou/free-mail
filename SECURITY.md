@@ -2,12 +2,14 @@
 
 ## Supported versions
 
-Only the latest release (see [Releases](../../releases)) receives fixes.
+Only the latest release (see <https://github.com/jabassou/free-mail/releases>) receives fixes.
 
 ## Reporting a vulnerability
 
-Please do **not** open a public issue. Use GitHub's private reporting:
-**Security > Report a vulnerability** on this repository.
+Please do **not** open a public issue. Report it privately through GitHub:
+<https://github.com/jabassou/free-mail/security/advisories/new>
+(Security tab > *Report a vulnerability*). Published advisories are listed at
+<https://github.com/jabassou/free-mail/security/advisories>.
 
 You will get an answer within 7 days. Please include the affected version, steps to
 reproduce and the impact.
