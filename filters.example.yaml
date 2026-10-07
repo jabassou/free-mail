@@ -1,0 +1,22 @@
+# Zimbra server-side filters (declarative).
+# `filters plan` shows the diff, `filters push --apply` writes it (backup taken first).
+# Existing server filters not listed here are KEPT unless --replace is used.
+# Conditions: from_contains, to_contains, cc_contains, subject_contains, from_is,
+#   subject_is, header_contains {name, value}, header_exists, size_over_kb
+#   (prefix any with not_ to negate). any: true => anyof, default allof.
+# Actions: fileinto, mark_read, flag, tag, redirect, keep, discard. stop: true by default.
+filters:
+  - name: Newsletters
+    conditions:
+      - header_exists: List-Unsubscribe
+    actions:
+      - fileinto: Newsletters
+
+  - name: Factures
+    any: true
+    conditions:
+      - subject_contains: facture
+      - subject_contains: invoice
+    actions:
+      - fileinto: Factures
+      - flag

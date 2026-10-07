@@ -1,0 +1,29 @@
+# Cleanup rules - evaluated in order, first matching rule wins per message.
+# Inside a key, list values are OR'ed; different keys are AND'ed.
+# Server-side keys (IMAP SEARCH, ASCII only): from, from_domain, to, subject,
+#   older_than_days, newer_than_days, larger_than_kb, unseen, flagged
+# Client-side keys: newsletter (has List-Unsubscribe), subject_regex, from_regex
+# Actions: trash | {move: "Folder/Sub"} | mark_read | flag
+trash_folder: auto        # auto-detect (\Trash, Trash, Corbeille) or explicit name
+
+rules:
+  - name: newsletters-old
+    folders: [INBOX]
+    match:
+      newsletter: true
+      older_than_days: 60
+    action: {move: Newsletters}
+
+  - name: notifications-very-old
+    folders: [INBOX]
+    match:
+      from: ["noreply", "no-reply", "notification"]
+      older_than_days: 365
+    action: trash
+
+  - name: big-old-attachments
+    folders: [INBOX, Sent]
+    match:
+      larger_than_kb: 10000
+      older_than_days: 730
+    action: flag

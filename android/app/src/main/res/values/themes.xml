@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fm_bg">#F6F7FB</color>
+    <color name="fm_accent">#7C3AED</color>
+    <style name="Theme.FreeMail" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/fm_bg</item>
+        <item name="android:colorAccent">@color/fm_accent</item>
+        <item name="android:colorPrimary">@color/fm_accent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

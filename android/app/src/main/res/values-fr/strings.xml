@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Free Mail</string>
+    <string name="ch_mail">Nouveaux messages</string>
+    <string name="ch_mail_desc">Un nouveau mail arrive dans un de tes dossiers</string>
+    <string name="ch_status">Mails non lus (barre d\'état)</string>
+    <string name="ch_status_desc">Compteur de non-lus permanent ; nécessaire pour vérifier les mails en arrière-plan</string>
+    <string name="status_watching">Free Mail surveille ta boîte</string>
+    <string name="status_none">Aucun mail non lu</string>
+    <string name="status_checked">vérifié à %1$s</string>
+    <string name="tap_to_open">Touche pour ouvrir</string>
+    <string name="action_mark_read">Marquer lu</string>
+    <string name="action_open">Ouvrir</string>
+    <string name="splash_tagline">Ta boîte Free, enfin sous contrôle</string>
+    <string name="splash_starting">Démarrage…</string>
+    <string name="splash_engine">Démarrage du moteur…</string>
+    <string name="splash_connecting">Connexion à ta boîte…</string>
+    <string name="err_server">Impossible de démarrer le serveur local</string>
+    <string name="err_no_app">Aucune appli pour ouvrir ce lien</string>
+    <string name="battery_title">Notifications fiables</string>
+    <string name="battery_msg">Pour être prévenu des nouveaux mails même quand le téléphone est en veille, autorise Free Mail à fonctionner sans restriction de batterie.</string>
+    <string name="allow">Autoriser</string>
+    <string name="later">Plus tard</string>
+    <string name="saved_downloads">Enregistré dans Téléchargements : %1$s</string>
+    <string name="setup_subtitle">Ta boîte Free sur ton téléphone : webmail, notifications, entretien et filtres.</string>
+    <string name="setup_email_hint">prenom@free.fr</string>
+    <string name="setup_password_hint">Mot de passe Free</string>
+    <string name="setup_email">Adresse Free</string>
+    <string name="setup_password">Mot de passe</string>
+    <string name="sign_in">Se connecter</string>
+    <string name="setup_note">Le mot de passe est chiffré sur le téléphone (clé du Keystore Android) et ne sert qu\'à te connecter à imap.free.fr et smtp.free.fr. Rien ne passe par un autre serveur.</string>
+    <string name="setup_missing">Renseigne ton adresse et ton mot de passe.</string>
+    <string name="setup_refused">Identifiant ou mot de passe refusé par Free.</string>
+    <string name="zimbra_title">Connexion au webmail Free</string>
+    <string name="zimbra_opening">Ouverture de la page de connexion…</string>
+    <string name="zimbra_sent">Identifiants envoyés, ouverture de la session…</string>
+    <string name="zimbra_reading">Session ouverte, lecture des filtres…</string>
+    <string name="zimbra_failed">Échec : %1$s
+Reviens en arrière et réessaie.</string>
+    <string name="zimbra_ok">Webmail connecté · %1$d filtres</string>
+    <string name="ch_quiet">Nouveaux messages (heures calmes)</string>
+    <string name="ch_quiet_desc">Nouveau mail pendant les heures calmes : sans son ni vibration</string>
+    <string name="action_reply">Répondre</string>
+    <string name="reply_hint">Ta réponse</string>
+    <string name="reply_sent">Réponse envoyée</string>
+    <string name="reply_failed">Réponse non envoyée</string>
+    <string name="lock_title">Free Mail est verrouillé</string>
+    <string name="lock_hint">Utilise ton empreinte, ton visage ou le code du téléphone pour ouvrir ta boîte.</string>
+    <string name="lock_unlock">Déverrouiller</string>
+    <string name="lock_no_secure">Active d\'abord un verrouillage d\'écran (code, schéma ou empreinte) sur le téléphone.</string>
+    <string name="update_bad_url">Lien de mise à jour invalide.</string>
+    <string name="update_allow_sources">Autorise Free Mail à installer des applis, puis appuie de nouveau sur Installer.</string>
+    <string name="update_running">Une mise à jour est déjà en téléchargement.</string>
+    <string name="update_failed">Mise à jour impossible : %1$s</string>
+    <plurals name="status_unread">
+        <item quantity="one">%1$d mail non lu</item>
+        <item quantity="other">%1$d mails non lus</item>
+    </plurals>
+</resources>

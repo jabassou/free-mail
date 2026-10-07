@@ -1,0 +1,24 @@
+config.yaml
+out/
+backups/
+.venv/
+__pycache__/
+.pytest_cache/
+.login-method
+free-mail-termux.zip
+*.apk
+junit.xml
+# runtime state written next to config.yaml
+settings.json
+outbox.json
+snooze.json
+notify-state.json
+filters.fixed.json
+rules.yaml
+zihYVft0
+*.plist
+# personal data / local-only files
+filters.fixed.json
+rules.yaml
+*.plist
+_to_delete/

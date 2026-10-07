@@ -1,0 +1,75 @@
+name: apk
+
+# Push a tag (git tag v1.4.0 && git push --tags) to build the signed APK and publish it as a
+# GitHub release; the app's "Updates" setting downloads it from there.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('android/**/*.gradle.kts', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64" || { echo "::error::ANDROID_KEYSTORE_B64 secret missing (run android/signing-backup.sh --github)"; exit 1; }
+          mkdir -p android/signing
+          echo "$KEYSTORE_B64" | base64 -d > android/signing/freemail-release.jks
+          printf 'storeFile=signing/freemail-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/signing/keystore.properties
+
+      - name: Version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: echo "${GITHUB_REF_NAME#v}" > VERSION
+
+      - name: Build
+        run: android/build-apk.sh
+
+      - name: Rename
+        run: mv FreeMail.apk "FreeMail-v$(cat VERSION).apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FreeMail-apk
+          path: FreeMail-v*.apk
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: FreeMail-v*.apk
+          generate_release_notes: true
+
+      - name: Remove the key from the runner
+        if: always()
+        run: rm -rf android/signing

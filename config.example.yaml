@@ -1,0 +1,4 @@
+user: prenom.nom@free.fr
+imap_host: imap.free.fr
+imap_port: 993
+zimbra_url: https://zimbra.free.fr

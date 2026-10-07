@@ -1,0 +1,11 @@
+.gradle/
+build/
+app/build/
+local.properties
+signing/
+app/src/main/assets/web/
+app/src/main/python/freemail.py
+app/src/main/python/mailweb.py
+app/src/main/python/webui.py
+app/src/main/python/extras.py
+*.apk

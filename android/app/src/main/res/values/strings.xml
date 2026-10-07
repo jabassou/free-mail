@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Free Mail</string>
+    <string name="ch_mail">New messages</string>
+    <string name="ch_mail_desc">A new mail arrives in one of your folders</string>
+    <string name="ch_status">Unread mail (status bar)</string>
+    <string name="ch_status_desc">Permanent unread counter; required to check mail in the background</string>
+    <string name="status_watching">Free Mail is watching your mailbox</string>
+    <string name="status_none">No unread mail</string>
+    <string name="status_checked">checked at %1$s</string>
+    <string name="tap_to_open">Tap to open</string>
+    <string name="action_mark_read">Mark read</string>
+    <string name="action_open">Open</string>
+    <string name="splash_tagline">Your Free mailbox, finally under control</string>
+    <string name="splash_starting">Starting…</string>
+    <string name="splash_engine">Starting the engine…</string>
+    <string name="splash_connecting">Connecting to your mailbox…</string>
+    <string name="err_server">Could not start the local server</string>
+    <string name="err_no_app">No app can open this link</string>
+    <string name="battery_title">Reliable notifications</string>
+    <string name="battery_msg">To be notified of new mail even when the phone is asleep, allow Free Mail to run without battery restrictions.</string>
+    <string name="allow">Allow</string>
+    <string name="later">Later</string>
+    <string name="saved_downloads">Saved to Downloads: %1$s</string>
+    <string name="setup_subtitle">Your Free mailbox on your phone: webmail, notifications, cleanup and filters.</string>
+    <string name="setup_email_hint">firstname@free.fr</string>
+    <string name="setup_password_hint">Free password</string>
+    <string name="setup_email">Free address</string>
+    <string name="setup_password">Password</string>
+    <string name="sign_in">Sign in</string>
+    <string name="setup_note">Your password is encrypted on the phone (Android Keystore key) and only used to connect to imap.free.fr and smtp.free.fr. Nothing goes through any other server.</string>
+    <string name="setup_missing">Enter your address and password.</string>
+    <string name="setup_refused">Address or password refused by Free.</string>
+    <string name="zimbra_title">Sign in to Free webmail</string>
+    <string name="zimbra_opening">Opening the sign-in page…</string>
+    <string name="zimbra_sent">Credentials sent, opening the session…</string>
+    <string name="zimbra_reading">Session open, reading filters…</string>
+    <string name="zimbra_failed">Failed: %1$s
+Go back and try again.</string>
+    <string name="zimbra_ok">Webmail connected · %1$d filters</string>
+    <string name="ch_quiet">New messages (quiet hours)</string>
+    <string name="ch_quiet_desc">New mail during your quiet hours: no sound, no vibration</string>
+    <string name="action_reply">Reply</string>
+    <string name="reply_hint">Your reply</string>
+    <string name="reply_sent">Reply sent</string>
+    <string name="reply_failed">Reply not sent</string>
+    <string name="lock_title">Free Mail is locked</string>
+    <string name="lock_hint">Use your fingerprint, face or phone PIN to open your mailbox.</string>
+    <string name="lock_unlock">Unlock</string>
+    <string name="lock_no_secure">Set a screen lock (PIN, pattern or fingerprint) on the phone first.</string>
+    <string name="update_bad_url">Invalid update link.</string>
+    <string name="update_allow_sources">Allow Free Mail to install apps, then tap Install again.</string>
+    <string name="update_running">An update is already downloading.</string>
+    <string name="update_failed">Update failed: %1$s</string>
+    <plurals name="status_unread">
+        <item quantity="one">%1$d unread mail</item>
+        <item quantity="other">%1$d unread mails</item>
+    </plurals>
+</resources>
