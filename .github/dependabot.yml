@@ -1,0 +1,21 @@
+# Weekly dependency updates, opened as PRs against dev.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule: { interval: weekly, day: monday }
+    groups:
+      actions: { patterns: ["*"] }
+  - package-ecosystem: pip
+    directories: ["/", "/tests"]
+    target-branch: dev
+    schedule: { interval: weekly, day: monday }
+    groups:
+      python: { patterns: ["*"] }
+  - package-ecosystem: gradle
+    directory: /android
+    target-branch: dev
+    schedule: { interval: weekly, day: monday }
+    groups:
+      android: { patterns: ["*"] }
