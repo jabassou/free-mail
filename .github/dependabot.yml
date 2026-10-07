@@ -19,6 +19,9 @@ updates:
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
+      # 1.17+ needs compileSdk 36/37 and AGP 9: comes with the AGP 9 migration
+      - dependency-name: "androidx.core:core-ktx"
+        versions: [">=1.17.0"]
     schedule: { interval: weekly, day: monday }
     groups:
       android: { patterns: ["*"] }
