@@ -193,7 +193,7 @@ def _ver(v: str) -> tuple:
 
 UPDATE_REPO = "jabassou/free-mail"   # releases published by .github/workflows/apk.yml
 UPDATE_API = f"https://api.github.com/repos/{UPDATE_REPO}/releases/latest"
-UPDATE_EVERY = 6 * 3600              # background check period (unauthenticated API: 60 req/h)
+UPDATE_EVERY = 30 * 60               # background check period; conditional requests (ETag, 304) cost no API quota
 _upd_lock = threading.Lock()
 
 
