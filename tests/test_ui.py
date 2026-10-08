@@ -75,6 +75,10 @@ def test_english_ui_has_no_french_left(browser, server):
     french = re.compile(r"[àâçéèêëîïôûùüœ]|\b(le|la|les|des|du|une|pour|dans|avec|aucun|aucune|ton|tes)\b", re.I)
     missing = [s for s in page.evaluate("[...I18N_MISSING]") if french.search(s)]
     assert missing == []
+    # placeholders of user-content fields (contenteditable / translate=no) are UI text too
+    assert page.get_attribute("#cBody", "data-ph") == "Write your message…"
+    assert page.get_attribute("#sSig", "data-ph") == "Your signature…"
+    assert page.get_attribute("#sName", "placeholder") == "e.g. John Smith"
     assert errors == []
 
 

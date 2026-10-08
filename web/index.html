@@ -1100,7 +1100,7 @@ function tr(s){
   const ATTRS=['placeholder','title','aria-label','data-ph'];
   const skip=n=>{ for(let e=n.nodeType===1?n:n.parentElement;e;e=e.parentElement){ const t=e.getAttribute&&e.getAttribute('translate'); if(t) return t==='no'; if(e.isContentEditable||/^(SCRIPT|STYLE|TEXTAREA|IFRAME|CODE|PRE)$/.test(e.tagName)) return true; } return false; };
   const text=n=>{ if(skip(n)) return; const v=tr(n.nodeValue); if(v!==n.nodeValue) n.nodeValue=v; };
-  const attrs=e=>{ if(e.nodeType!==1||skip(e)) return; for(const a of ATTRS){ const o=e.getAttribute(a); if(o){ const v=tr(o); if(v!==o) e.setAttribute(a,v); } } };
+  const attrs=e=>{ if(e.nodeType!==1) return; const only=skip(e)?['data-ph','placeholder'].filter(a=>e.hasAttribute(a)):ATTRS; for(const a of only){ const o=e.getAttribute(a); if(o){ const v=tr(o); if(v!==o) e.setAttribute(a,v); } } };
   const walk=root=>{ if(root.nodeType===3) return text(root); if(root.nodeType!==1) return; attrs(root);
     const w=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT); let n; while((n=w.nextNode())) n.nodeType===3?text(n):attrs(n); };
   walk(document.body); document.title=tr(document.title);
@@ -1235,7 +1235,7 @@ function renderDash(o){
     {l:'Espace utilisé',v:pct,suf:' %',s:q?`${(q.used/1048576).toFixed(2)} Go sur ${(q.limit/1048576).toFixed(0)} Go`:'quota indisponible',ic:'drive',bg:'linear-gradient(135deg,#6366f1,#8b5cf6)',bar:pct,g:'rgba(99,102,241,.22)'},
     {l:'Boîte de réception',v:inbox.messages,s:`${num(inbox.unseen)} non lus`,ic:'inbox',bg:'linear-gradient(135deg,#0ea5e9,#14b8c4)',g:'rgba(14,165,233,.2)'},
     {l:'Total des mails',v:total,s:`${o.folders.length} dossiers`,ic:'mail',bg:'linear-gradient(135deg,#22c55e,#14b8c4)',g:'rgba(34,197,94,.18)'},
-    {l:'Corbeille · Spam',v:(trash?.messages||0)+(junk?.messages||0),s:`${num(trash?.messages)} corbeille · ${num(junk?.messages)} spam · <a href="#" data-goto="maint">vider</a>`,ic:'trash',bg:'linear-gradient(135deg,#f59e0b,#ec4899)',g:'rgba(236,72,153,.18)'},
+    {l:'Corbeille · Spam',v:(trash?.messages||0)+(junk?.messages||0),s:`${num(trash?.messages)} ${LANG==='fr'?'corbeille':'trash'} · ${num(junk?.messages)} spam · <a href="#" data-goto="maint">vider</a>`,ic:'trash',bg:'linear-gradient(135deg,#f59e0b,#ec4899)',g:'rgba(236,72,153,.18)'},
   ];
   $('#kpis').innerHTML=K.map((k,i)=>`<div class="card kpi" style="--glow:${k.g};animation:fade .45s ${i*.07}s both">
     <div class="head"><div class="ico" style="background:${k.bg}">${I(k.ic,'sm')}</div>${k.l}</div>
@@ -1243,9 +1243,9 @@ function renderDash(o){
     ${k.bar!==undefined?`<div class="bar"><i data-w="${k.bar}"></i></div>`:''}</div>`).join('');
   $$('#kpis .v').forEach(el=>countUp(el,+el.dataset.v,el.dataset.suf)); setTimeout(()=>$$('#kpis .bar i').forEach(b=>b.style.width=b.dataset.w+'%'),60);
   $$('[data-goto]').forEach(a=>a.onclick=e=>{e.preventDefault();tab(a.dataset.goto)});
-  if(q) chart('chQuota',{type:'doughnut',data:{labels:['Utilisé','Libre'],datasets:[{data:[q.used,q.limit-q.used],backgroundColor:c=>c.dataIndex===0?grad(c.chart.ctx,c.chart.chartArea,css('--c1'),css('--c2')):css('--line2'),borderWidth:0,borderRadius:8,spacing:2}]},
+  if(q) chart('chQuota',{type:'doughnut',data:{labels:LANG==='fr'?['Utilisé','Libre']:['Used','Free'],datasets:[{data:[q.used,q.limit-q.used],backgroundColor:c=>c.dataIndex===0?grad(c.chart.ctx,c.chart.chartArea,css('--c1'),css('--c2')):css('--line2'),borderWidth:0,borderRadius:8,spacing:2}]},
     options:{maintainAspectRatio:false,cutout:'76%',plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:16}},tooltip:{callbacks:{label:c=>`${c.label} : ${(c.raw/1048576).toFixed(2)} Go`}}}},
-    plugins:[{id:'center',afterDraw(c){const {ctx,chartArea:a}=c,x=(a.left+a.right)/2,y=(a.top+a.bottom)/2;ctx.save();ctx.textAlign='center';ctx.fillStyle=css('--ink');ctx.font=`800 30px ${css('--font')}`;ctx.fillText(pct+' %',x,y+6);ctx.fillStyle=css('--muted');ctx.font=`500 11.5px ${css('--font')}`;ctx.fillText('utilisé',x,y+24);ctx.restore();}}]});
+    plugins:[{id:'center',afterDraw(c){const {ctx,chartArea:a}=c,x=(a.left+a.right)/2,y=(a.top+a.bottom)/2;ctx.save();ctx.textAlign='center';ctx.fillStyle=css('--ink');ctx.font=`800 30px ${css('--font')}`;ctx.fillText(pct+' %',x,y+6);ctx.fillStyle=css('--muted');ctx.font=`500 11.5px ${css('--font')}`;ctx.fillText(LANG==='fr'?'utilisé':'used',x,y+24);ctx.restore();}}]});
   const top=[...o.folders].sort((a,b)=>b.messages-a.messages).slice(0,12);
   chart('chFolders',hbar(top.map(f=>f.name),top.map(f=>f.messages),'mails'));
   renderStats(o.stats);
@@ -1257,15 +1257,18 @@ function statsEmpty(on){
       e.innerHTML=I('bars')+'<div>Pas encore de statistiques</div><button class="btn primary xs">'+I('zap','sm')+'Calculer (2 à 5 min)</button>'; e.querySelector('button').onclick=()=>$('#runReport').click(); box.parentElement.appendChild(e);} if(!on&&e) e.remove(); });
   ['#biggest','#newsletters'].forEach(sel=>{ if(on) $(sel).innerHTML='<div class="empty">'+I('bars')+'Disponible après le calcul des statistiques</div>'; });
 }
-function ago(d){ const s=(Date.now()-new Date(d))/1000; return s<90?'à l\'instant':s<3600?`il y a ${Math.round(s/60)} min`:s<86400?`il y a ${Math.round(s/3600)} h`:`il y a ${Math.round(s/86400)} j`; }
+function ago(d){ const s=(Date.now()-new Date(d))/1000, fr=LANG==='fr', n=Math.round;
+  if(s<90) return fr?'à l\'instant':'just now';
+  const [v,u]=s<3600?[n(s/60),'min']:s<86400?[n(s/3600),'h']:[n(s/86400),fr?'j':'d'];
+  return fr?`il y a ${v} ${u}`:`${v} ${u} ago`; }
 function renderStats(s){
   if(!s){ $('#statsDate').textContent='Statistiques pas encore calculées'; statsEmpty(true); return; }
   statsEmpty(false);
   $('#statsDate').innerHTML=`Statistiques calculées ${ago(s.generated)} · <b>${num(s.total?.messages)}</b> mails · <b>${num(s.total?.senders)}</b> expéditeurs`;
-  const ages=['<30d','<1y','<3y','>=3y'], al={'<30d':'< 30 j','<1y':'< 1 an','<3y':'1 à 3 ans','>=3y':'> 3 ans'};
+  const ages=['<30d','<1y','<3y','>=3y'], al=LANG==='fr'?{'<30d':'< 30 j','<1y':'< 1 an','<3y':'1 à 3 ans','>=3y':'> 3 ans'}:{'<30d':'< 30 d','<1y':'< 1 yr','<3y':'1 to 3 yrs','>=3y':'> 3 yrs'};
   chart('chAges',{type:'bar',data:{labels:ages.map(a=>al[a]),datasets:[
       {label:'mails',data:ages.map(a=>s.ages[a].count),backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,css('--c2'),css('--c1')),borderRadius:8,borderSkipped:false,yAxisID:'y',maxBarThickness:34},
-      {label:'Mo',data:ages.map(a=>+(s.ages[a].size/1048576).toFixed(0)),backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,css('--c3'),css('--c4')),borderRadius:8,borderSkipped:false,yAxisID:'y1',maxBarThickness:34}]},
+      {label:LANG==='fr'?'Mo':'MB',data:ages.map(a=>+(s.ages[a].size/1048576).toFixed(0)),backgroundColor:c=>grad(c.chart.ctx,c.chart.chartArea,css('--c3'),css('--c4')),borderRadius:8,borderSkipped:false,yAxisID:'y1',maxBarThickness:34}]},
     options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:16}}},scales:{x:{grid:{display:false},border:{display:false}},y:{position:'left',border:{display:false},grid:{color:css('--line')}},y1:{position:'right',grid:{display:false},border:{display:false}}}}});
   const ys=Object.keys(s.years||{});
   chart('chYears',{type:'line',data:{labels:ys,datasets:[{label:'mails',data:ys.map(y=>s.years[y]),borderColor:css('--c1'),borderWidth:2.5,
