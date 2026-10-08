@@ -52,6 +52,9 @@ Reviens en arrière et réessaie.</string>
     <string name="update_allow_sources">Autorise Free Mail à installer des applis, puis appuie de nouveau sur Installer.</string>
     <string name="update_running">Une mise à jour est déjà en téléchargement.</string>
     <string name="update_failed">Mise à jour impossible : %1$s</string>
+    <string name="ch_update">Mises à jour de l\'appli</string>
+    <string name="ch_update_desc">Une nouvelle version de Free Mail est disponible</string>
+    <string name="action_update">Mettre à jour</string>
     <plurals name="status_unread">
         <item quantity="one">%1$d mail non lu</item>
         <item quantity="other">%1$d mails non lus</item>

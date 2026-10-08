@@ -46,7 +46,7 @@ DEFAULTS = {
     "notify_off": [],           # folder names that never notify
     "quiet": {"on": False, "start": "22:00", "end": "07:00"},
     "push_folders": ["INBOX"],  # IMAP IDLE (instant) - max 5 connections
-    "update_repo": "",          # owner/name of the GitHub repo publishing the APK releases
+    "update_skip": "",          # release version the user chose to skip (no prompt, no notification)
     "undo_seconds": 8,
 }
 _lock = threading.RLock()
@@ -108,6 +108,8 @@ def save_settings(patch: dict) -> dict:
                 v = mailweb._clean_html(str(v or ""))[:20000]
             if k == "undo_seconds":
                 v = max(0, min(30, int(v or 0)))
+            if k == "update_skip":
+                v = re.sub(r"[^\w.-]", "", str(v or ""))[:40]
             cur[k] = v
         STORE.save("settings.json", cur)
         diag("settings saved")
@@ -189,23 +191,76 @@ def _ver(v: str) -> tuple:
     return tuple(int(x) for x in re.findall(r"\d+", v or "")[:3]) or (0,)
 
 
-def check_update(repo: str, current: str) -> dict:
-    """Latest GitHub release of `owner/name`: {"available", "version", "apk", "url", "notes"}."""
+UPDATE_REPO = "jabassou/free-mail"   # releases published by .github/workflows/apk.yml
+UPDATE_API = f"https://api.github.com/repos/{UPDATE_REPO}/releases/latest"
+UPDATE_EVERY = 6 * 3600              # background check period (unauthenticated API: 60 req/h)
+_upd_lock = threading.Lock()
+
+
+def _http_get(url: str, headers: dict) -> tuple[int, dict, bytes]:
+    """(status, headers, body); 304 is a normal answer here, not an error."""
+    import urllib.error
     import urllib.request
-    if not re.fullmatch(r"[\w.-]+/[\w.-]+", repo or ""):
-        return {"available": False, "configured": False, "current": current}
-    req = urllib.request.Request(f"https://api.github.com/repos/{repo}/releases/latest",
-                                 headers={"Accept": "application/vnd.github+json", "User-Agent": "free-mail"})
+    req = urllib.request.Request(url, headers={"User-Agent": "free-mail", **headers})
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
-            rel = json.load(r)
-    except Exception as e:  # noqa: BLE001
-        diag(f"update check failed: {e}", "warn")
-        raise mailweb.MailError(f"Vérification impossible : {e}") from None
-    tag = rel.get("tag_name") or ""
-    apk = next((x["browser_download_url"] for x in rel.get("assets", []) if x.get("name", "").endswith(".apk")), None)
-    return {"available": _ver(tag) > _ver(current), "configured": True, "current": current,
-            "version": tag.lstrip("v"), "apk": apk, "url": rel.get("html_url"), "notes": (rel.get("body") or "")[:2000]}
+            return r.status, dict(r.headers), r.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 304:
+            return 304, dict(e.headers), b""
+        raise
+
+
+def check_update(current: str, force: bool = False) -> dict:
+    """Latest release of the app, cached UPDATE_EVERY seconds (ETag: an unchanged release costs no quota)."""
+    with _upd_lock:
+        st = STORE.load("update.json", {})
+        if force or not st.get("release") or time.time() - st.get("checked", 0) > UPDATE_EVERY:
+            headers = {"Accept": "application/vnd.github+json"}
+            if st.get("etag") and st.get("release"):
+                headers["If-None-Match"] = st["etag"]
+            try:
+                code, h, body = _http_get(UPDATE_API, headers)
+                if code == 200:
+                    rel = json.loads(body)
+                    st["release"] = {
+                        "tag": rel.get("tag_name") or "", "url": rel.get("html_url"),
+                        "notes": (rel.get("body") or "")[:4000],
+                        "apk": next((a["browser_download_url"] for a in rel.get("assets", [])
+                                     if a.get("name", "").endswith(".apk")), None)}
+                    st["etag"] = h.get("ETag") or h.get("etag")
+            except Exception as e:  # noqa: BLE001
+                diag(f"update check failed: {e}", "warn")
+                st["checked"] = time.time()  # back off until the next period
+                STORE.save("update.json", st)
+                if not st.get("release"):
+                    raise mailweb.MailError(f"Vérification impossible : {e}") from None
+            st["checked"] = time.time()
+            STORE.save("update.json", st)
+        rel = st.get("release") or {}
+    version = (rel.get("tag") or "").lstrip("v")
+    skip = get_settings().get("update_skip") or ""
+    return {"current": current, "version": version, "available": bool(version) and _ver(version) > _ver(current),
+            "skipped": bool(skip) and skip == version, "apk": rel.get("apk"), "url": rel.get("url"),
+            "notes": rel.get("notes") or "", "checked": st.get("checked"), "repo": UPDATE_REPO}
+
+
+def update_to_announce(current: str) -> dict | None:
+    """For the background notifier: a newer, not skipped release, returned once per version."""
+    try:
+        r = check_update(current)
+    except Exception:  # noqa: BLE001
+        return None
+    if not r["available"] or r["skipped"]:
+        return None
+    with _upd_lock:
+        st = STORE.load("update.json", {})
+        if st.get("announced") == r["version"]:
+            return None
+        st["announced"] = r["version"]
+        STORE.save("update.json", st)
+    diag(f"update available: {r['version']}")
+    return r
 
 
 def snooze(mb: fm.Mailbox, folder: str, uids, until) -> dict:

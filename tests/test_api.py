@@ -106,9 +106,20 @@ def test_diag(server):
     assert any("server started" in x["msg"] for x in d["log"])
 
 
-def test_update_without_repo(server):
-    server("settings", {"update_repo": ""})
-    assert server("update")["configured"] is False
+def test_update_status_and_skip(server):
+    import conftest
+    r = server("update?force=1")
+    assert r["repo"] == "jabassou/free-mail" and r["available"] and r["version"] == "99.0.0"
+    assert r["apk"].endswith(".apk") and r["skipped"] is False
+    assert server("update/skip", {"version": "99.0.0"})["skipped"] == "99.0.0"
+    assert server("update")["skipped"] is True
+    server("update/skip", {"version": ""})
+    assert conftest.GITHUB_CALLS, "the fake GitHub API was used"
+
+
+def test_update_repo_setting_is_gone(server):
+    assert "update_repo" not in server("settings")
+    assert "update_repo" not in server("settings", {"update_repo": "evil/repo"})
 
 
 def test_bad_token_is_refused(server):

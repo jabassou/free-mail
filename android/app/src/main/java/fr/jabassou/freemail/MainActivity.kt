@@ -148,6 +148,10 @@ class MainActivity : ComponentActivity() {
     private fun hashFor(intent: Intent?): String {
         if (intent == null) return ""
         // extras can come from any app (the activity is exported for mailto:): validate before use
+        when (intent.getStringExtra("update")) {
+            "show" -> return "#update"
+            "install" -> return "#update&go=1"
+        }
         intent.getStringExtra("folder")?.takeIf { it.isNotBlank() && it.length <= 200 }?.let { f ->
             val uid = intent.getStringExtra("uid")?.takeIf { it.matches(Regex("\\d{1,10}")) }
             return "#m=" + Uri.encode(f) + (if (uid != null) "&u=$uid" else "")
@@ -375,6 +379,14 @@ class MainActivity : ComponentActivity() {
             web.setBackgroundColor(bg)
             window.decorView.setBackgroundColor(bg)
             if (splash.visibility != View.VISIBLE) applyBars()
+        }
+
+        /** Android share sheet (diagnostics). */
+        @JavascriptInterface
+        fun share(title: String, text: String) = runOnUiThread {
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+                .putExtra(Intent.EXTRA_SUBJECT, title).putExtra(Intent.EXTRA_TEXT, text.take(200_000))
+            startActivity(Intent.createChooser(send, title))
         }
 
         @JavascriptInterface

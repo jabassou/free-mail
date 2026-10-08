@@ -12,6 +12,7 @@ junit.xml
 settings.json
 outbox.json
 snooze.json
+update.json
 notify-state.json
 filters.fixed.json
 rules.yaml

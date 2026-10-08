@@ -147,6 +147,21 @@ class Api:
         return data
 
 
+# What the fake GitHub API answers for the app's latest release (tests may change it).
+RELEASE = {"tag_name": "v99.0.0", "html_url": "https://github.com/jabassou/free-mail/releases/tag/v99.0.0",
+           "body": "- New things", "assets": [{"name": "FreeMail-v99.0.0.apk",
+           "browser_download_url": "https://github.com/jabassou/free-mail/releases/download/v99.0.0/FreeMail-v99.0.0.apk"}]}
+GITHUB_CALLS: list = []
+
+
+def fake_http_get(url, headers):
+    GITHUB_CALLS.append((url, dict(headers)))
+    etag = '"' + RELEASE["tag_name"] + '"'
+    if headers.get("If-None-Match") == etag:
+        return 304, {"ETag": etag}, b""
+    return 200, {"ETag": etag}, json.dumps(RELEASE).encode()
+
+
 def wait_for(fn, timeout=20.0, every=0.3):
     end = time.time() + timeout
     while time.time() < end:
@@ -167,6 +182,7 @@ def server(imap, smtp, tmp_path_factory):
     webui.STATE["cfg"] = {"user": USER, "imap_host": "127.0.0.1", "imap_port": IMAP_PORT,
                           "smtp_host": "127.0.0.1", "smtp_port": smtp.port}
     extras.init(lambda: home)
+    extras._http_get = fake_http_get  # never call GitHub from the tests
     srv = webui.start_server(0, imap_session=True, notify="log", interval=20)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{srv.server_address[1]}/"

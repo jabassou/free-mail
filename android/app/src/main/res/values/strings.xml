@@ -52,6 +52,9 @@ Go back and try again.</string>
     <string name="update_allow_sources">Allow Free Mail to install apps, then tap Install again.</string>
     <string name="update_running">An update is already downloading.</string>
     <string name="update_failed">Update failed: %1$s</string>
+    <string name="ch_update">App updates</string>
+    <string name="ch_update_desc">A new version of Free Mail is available</string>
+    <string name="action_update">Update</string>
     <plurals name="status_unread">
         <item quantity="one">%1$d unread mail</item>
         <item quantity="other">%1$d unread mails</item>

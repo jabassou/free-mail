@@ -95,25 +95,63 @@ def test_version_compare(a, b, newer):
     assert (extras._ver(a) > extras._ver(b)) is newer
 
 
-def test_check_update(monkeypatch):
-    rel = {"tag_name": "v9.0.0", "html_url": "https://github.com/o/r/releases/tag/v9.0.0", "body": "notes",
-           "assets": [{"name": "FreeMail-v9.0.0.apk", "browser_download_url": "https://github.com/o/r/releases/download/v9.0.0/FreeMail-v9.0.0.apk"}]}
+class FakeGitHub:
+    def __init__(self, tag="v9.0.0"):
+        self.tag, self.calls = tag, []
 
-    class Resp(io.BytesIO):
-        def __enter__(self):
-            return self
+    def __call__(self, url, headers):
+        self.calls.append(dict(headers))
+        etag = '"' + self.tag + '"'
+        if headers.get("If-None-Match") == etag:
+            return 304, {"ETag": etag}, b""
+        body = {"tag_name": self.tag, "html_url": "https://github.com/jabassou/free-mail/releases/x", "body": "notes",
+                "assets": [{"name": "FreeMail.apk", "browser_download_url": "https://github.com/x/FreeMail.apk"}]}
+        return 200, {"ETag": etag}, json.dumps(body).encode()
 
-        def __exit__(self, *a):
-            return False
 
-    seen = {}
-
-    def fake_urlopen(req, timeout=0):
-        seen["url"] = req.full_url
-        return Resp(json.dumps(rel).encode())
-
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-    r = extras.check_update("o/r", "1.4.0")
-    assert seen["url"] == "https://api.github.com/repos/o/r/releases/latest"
+def test_check_update_uses_the_app_repository(store, monkeypatch):
+    gh = FakeGitHub()
+    monkeypatch.setattr(extras, "_http_get", lambda url, h: (gh.calls.append(url) or gh(url, h)))
+    r = extras.check_update("1.4.0")
     assert r["available"] and r["version"] == "9.0.0" and r["apk"].endswith(".apk")
-    assert extras.check_update("not a repo", "1.4.0")["configured"] is False
+    assert "https://api.github.com/repos/jabassou/free-mail/releases/latest" in gh.calls
+
+
+def test_check_update_is_cached_and_uses_etag(store, monkeypatch):
+    gh = FakeGitHub()
+    monkeypatch.setattr(extras, "_http_get", gh)
+    extras.check_update("1.4.0")
+    extras.check_update("1.4.0")                      # cached: no request
+    assert len(gh.calls) == 1
+    extras.check_update("1.4.0", force=True)         # forced: conditional request, answered 304
+    assert len(gh.calls) == 2 and gh.calls[1].get("If-None-Match") == '"v9.0.0"'
+    assert extras.check_update("1.4.0")["version"] == "9.0.0"
+
+
+def test_up_to_date_and_older_release(store, monkeypatch):
+    monkeypatch.setattr(extras, "_http_get", FakeGitHub("v1.4.0"))
+    assert extras.check_update("1.4.0")["available"] is False
+    assert extras.check_update("1.5.0", force=True)["available"] is False
+
+
+def test_update_announced_once_and_skippable(store, monkeypatch):
+    gh = FakeGitHub("v9.0.0")
+    monkeypatch.setattr(extras, "_http_get", gh)
+    assert extras.update_to_announce("1.4.0")["version"] == "9.0.0"
+    assert extras.update_to_announce("1.4.0") is None           # same version: announced once
+    gh.tag = "v9.1.0"
+    extras.save_settings({"update_skip": "9.1.0"})
+    extras.check_update("1.4.0", force=True)
+    assert extras.update_to_announce("1.4.0") is None           # skipped by the user
+    gh.tag = "v9.2.0"
+    extras.check_update("1.4.0", force=True)
+    assert extras.update_to_announce("1.4.0")["version"] == "9.2.0"
+
+
+def test_update_check_offline(store, monkeypatch):
+    def boom(url, h):
+        raise OSError("network unreachable")
+    monkeypatch.setattr(extras, "_http_get", boom)
+    with pytest.raises(extras.mailweb.MailError):
+        extras.check_update("1.4.0")
+    assert extras.update_to_announce("1.4.0") is None
