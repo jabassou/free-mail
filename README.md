@@ -149,7 +149,7 @@ How it works:
 
 Server side in `extras.py` (shared by the desktop UI, Termux and the Android app); state is kept in JSON files next to `config.yaml` (`settings.json`, `outbox.json`, `snooze.json`, gitignored).
 
-- **Settings tab**: display name and HTML signature (sanitized, added to new messages, replies and forwards), undo-send delay (0-30 s), quiet hours, per-folder notifications, "instant" folders (IMAP IDLE push, max 5 connections), language, app lock (Android), update repository, diagnostics with "Copy logs".
+- **Settings tab**: display name and HTML signature (sanitized, added to new messages, replies and forwards), undo-send delay (0-30 s), quiet hours, per-folder notifications, "instant" folders (IMAP IDLE push, max 5 connections), language, app lock (Android).
 - **Undo send / send later**: the mail goes to the local outbox (`/api/mail/schedule`) and `extras.Scheduler` sends it when due (wakes exactly at the next due item). "Undo" cancels it and reopens the composer; draft attachments are copied into the outbox before the draft is deleted. Failed sends retry with backoff (8 attempts). Scheduled mails are listed in Settings (send now / cancel back to Drafts).
 - **Snooze**: moves the mail to the `En attente` folder and records its `Message-ID`; at the chosen time it comes back unread to its folder (and notifies).
 - **Search in bodies**: "Body" toggle next to the list filters (`body=1`, IMAP `BODY` criterion, slower).
@@ -158,7 +158,8 @@ Server side in `extras.py` (shared by the desktop UI, Termux and the Android app
 - **Offline mode**: the service worker keeps the last lists, messages and conversations read and serves them when the mailbox is unreachable (banner "Offline").
 - **Notifications (Android)**: quiet hours use a silent channel; inline "Reply" from the notification (RemoteInput -> `extras.quick_reply`, threaded reply with signature).
 - **App lock (Android)**: fingerprint / face / phone PIN when the app is opened (30 s grace period); the recent-apps preview is hidden while it is on.
-- **Updates (Android)**: Settings > Updates checks the latest GitHub release of `owner/name` (also once a day at startup) and installs the APK through the system installer. The release must be signed with the same key, and the repository (or at least its releases) must be public for the unauthenticated GitHub API.
+- **Updates**: the app checks the latest GitHub release of `jabassou/free-mail` (fixed in `extras.UPDATE_REPO`) every 6 h in the background (ETag, cached in `update.json`), posts a notification once per new version (Android: **Update** button starts the download and the system installer) and shows an update dialog at startup (Update now / Later / Skip this version). "Check for updates" is also in the menu. Releases must be signed with the same key and the repository must stay public (unauthenticated GitHub API).
+- **Diagnostics**: own screen in the menu (version, IMAP/webmail/notifier state, Android delivery status, technical log) with Copy / Share.
 
 ## Tests
 

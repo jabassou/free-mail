@@ -89,7 +89,8 @@ kbd{border-bottom-width:2px}
 
 /* ============================================================ components */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;box-shadow:var(--shadow);min-width:0;position:relative}
-.card-h{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.card-h{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.card-h .tools{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
 .card-h h3{margin:0;font-size:14.5px;font-weight:650}
 .chip-ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);flex:0 0 auto}
 .card-h .sp,.sp{flex:1}
@@ -506,6 +507,17 @@ details summary::before{content:"›";font-size:16px;line-height:1;transition:tr
   .mfilters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -14px;padding:0 14px}.mfilters::-webkit-scrollbar{display:none}.mfilters button{flex:0 0 auto}
   .compose .cf{gap:8px}
 }
+/* ---- update dialog */
+.upd-scrim{position:fixed;inset:0;background:rgba(5,6,12,.55);z-index:90;display:grid;place-items:center;padding:16px;animation:fade .2s both}
+.upd-box{background:var(--surface);border:1px solid var(--line2);border-radius:18px;box-shadow:var(--shadow-lg);width:min(460px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;overflow:hidden}
+.upd-box .hd{display:flex;gap:12px;align-items:center;padding:18px 18px 10px}
+.upd-box .hd .chip-ic{width:42px;height:42px;border-radius:12px;background:var(--grad);color:#fff}.upd-box .hd .chip-ic .ic{stroke:#fff}
+.upd-box h3{margin:0;font-size:17px}.upd-box .sub{font-size:12.5px;color:var(--muted)}
+.upd-box .notes{margin:0 18px;padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--line);font-size:13px;white-space:pre-wrap;overflow:auto;max-height:40vh;color:var(--ink2)}
+.upd-box .ft{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:14px 18px 18px}
+.upd-box .ft .skip{margin-right:auto}
+.upd-ver{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;margin:4px 0 12px}.upd-ver b{color:var(--muted);font-weight:600}
+#diag .diag-kv{margin-bottom:12px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -632,7 +644,9 @@ details summary::before{content:"›";font-size:16px;line-height:1;transition:tr
     <button class="nav-item" data-tab="filters"><svg class="ic"><use href="#i-filter"/></svg>Filtres<span class="badge" id="navFCount"></span></button>
     <button class="nav-item" data-tab="help"><svg class="ic"><use href="#i-help"/></svg>Aide</button>
     <button class="nav-item" data-tab="settings"><svg class="ic"><use href="#i-gear"/></svg>Réglages</button>
+    <button class="nav-item" data-tab="diag"><svg class="ic"><use href="#i-info"/></svg>Diagnostic</button>
     <div class="side-foot">
+      <button class="nav-item" id="updBtn" data-check-update><svg class="ic"><use href="#i-dl"/></svg><span class="lbl">Rechercher une mise à jour</span></button>
       <button class="nav-item" id="themeBtn"><svg class="ic" id="themeIc"><use href="#i-moon"/></svg><span class="lbl" id="themeLbl">Thème</span></button>
       <div class="user"><div class="av" id="meAv" style="background:var(--grad)">?</div><div style="min-width:0"><div class="who" id="who"></div><div class="tiny muted"><span style="color:var(--ok)">●</span> Session active</div></div></div>
       <button class="nav-item" id="logout"><svg class="ic"><use href="#i-out"/></svg><span class="lbl">Déconnexion</span></button>
@@ -769,15 +783,20 @@ details summary::before{content:"›";font-size:16px;line-height:1;transition:tr
         <div class="card"><div class="card-h"><div class="chip-ic"><svg class="ic sm"><use href="#i-shield"/></svg></div><h3>Application</h3><span class="sp"></span><span class="chip" id="sVer"></span></div>
           <div class="set-row" style="border-top:0;padding-top:0"><div class="grow"><b>Langue</b></div><select id="sLang" aria-label="Langue / Language"><option value="">Auto (système)</option><option value="fr" translate="no">Français</option><option value="en" translate="no">English</option></select></div>
           <div class="set-row hidden" id="sLockRow"><div class="grow"><b>Verrouillage</b><div class="d">Empreinte, visage ou code du téléphone à l'ouverture</div></div><label class="switch"><input type="checkbox" id="sLock"><span></span></label></div>
-          <div class="set-row"><div class="grow"><b>Mises à jour</b><div class="d">Dépôt GitHub qui publie l'APK (propriétaire/nom)</div>
-            <input id="sRepo" placeholder="utilisateur/free-mail" style="width:100%;margin-top:8px" translate="no" autocapitalize="off" spellcheck="false"></div></div>
-          <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="sUpd"><svg class="ic sm"><use href="#i-refresh"/></svg>Vérifier</button><span class="small" id="sUpdRes"></span></div>
+          <div class="set-row"><div class="grow"><b>Mises à jour</b><div class="d">Vérifiées automatiquement ; une notification signale chaque nouvelle version.</div></div></div>
+          <div class="upd-ver"><b>Installée</b><span id="sVerCur" translate="no">—</span><b>Dernière</b><span id="sVerLast" translate="no">—</span></div>
+          <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn" id="sUpd" data-check-update><svg class="ic sm"><use href="#i-refresh"/></svg>Rechercher une mise à jour</button><span class="small" id="sUpdRes"></span></div>
         </div>
       </div>
-      <div class="card" style="margin-top:16px"><div class="card-h"><div class="chip-ic"><svg class="ic sm"><use href="#i-info"/></svg></div><h3>Diagnostic</h3><span class="sp"></span>
-          <button class="btn xs" id="sDiagR"><svg class="ic sm"><use href="#i-refresh"/></svg>Actualiser</button><button class="btn xs" id="sCopy"><svg class="ic sm"><use href="#i-copy"/></svg>Copier les journaux</button></div>
+    </section>
+
+    <!-- ===================== DIAGNOSTICS -->
+    <section id="diag" class="tab view hidden">
+      <div class="top"><div><h1>Diagnostic</h1><p>État de l'appli, à joindre à un signalement de bug.</p></div></div>
+      <div class="card"><div class="card-h"><div class="chip-ic"><svg class="ic sm"><use href="#i-info"/></svg></div><h3>État</h3>
+          <div class="tools"><button class="btn xs" id="sDiagR"><svg class="ic sm"><use href="#i-refresh"/></svg>Actualiser</button><button class="btn xs" id="sCopy"><svg class="ic sm"><use href="#i-copy"/></svg>Copier</button><button class="btn xs hidden" id="sShare"><svg class="ic sm"><use href="#i-send"/></svg>Partager</button></div></div>
         <div class="diag-kv" id="sDiag"></div>
-        <details><summary>Journal technique</summary><div class="log" id="sLog" translate="no"></div></details></div>
+        <details open><summary>Journal technique</summary><div class="log" id="sLog" translate="no"></div></details></div>
     </section>
   </div></main>
 </div>
@@ -861,8 +880,10 @@ details summary::before{content:"›";font-size:16px;line-height:1;transition:tr
     <button class="dnav" data-dtab="maint"><svg class="ic"><use href="#i-spark"/></svg>Entretien</button>
     <button class="dnav" data-dtab="filters"><svg class="ic"><use href="#i-filter"/></svg>Filtres</button>
     <button class="dnav" data-dtab="settings"><svg class="ic"><use href="#i-gear"/></svg>Réglages</button>
+    <button class="dnav" data-dtab="diag"><svg class="ic"><use href="#i-info"/></svg>Diagnostic</button>
     <button class="dnav" data-dtab="help"><svg class="ic"><use href="#i-help"/></svg>Aide</button>
     <div class="dsep"></div>
+    <button class="dnav" id="dUpd" data-check-update><svg class="ic"><use href="#i-dl"/></svg>Rechercher une mise à jour</button>
     <button class="dnav" id="dTheme"><svg class="ic"><use href="#i-moon"/></svg><span id="dThemeLbl">Thème</span></button>
     <button class="dnav hidden" id="dAccount"><svg class="ic"><use href="#i-users"/></svg>Compte Free</button>
     <button class="dnav" id="dLogout"><svg class="ic"><use href="#i-out"/></svg>Déconnexion</button>
@@ -875,6 +896,9 @@ details summary::before{content:"›";font-size:16px;line-height:1;transition:tr
 
 <script>
 const I18N_EN={
+'Diagnostic':'Diagnostics',"État de l'appli, à joindre à un signalement de bug.":'App status, to attach to a bug report.','État':'Status','Copier':'Copy','Partager':'Share',
+'Rechercher une mise à jour':'Check for updates','Vérifiées automatiquement ; une notification signale chaque nouvelle version.':'Checked automatically; a notification announces every new version.',
+'Installée':'Installed','Dernière':'Latest','Nouvelle version disponible':'New version available','Ignorer cette version':'Skip this version','Mettre à jour':'Update',
 'Réglages':'Settings','Répéter plus tard (H)':'Snooze (H)','Contenu du message':'Message content','Appliqués tout de suite.':'Applied immediately.','Enregistré ✓':'Saved ✓','Identité et envoi':'Identity and sending',
 'Nom affiché aux destinataires':'Name shown to recipients','ex. Jean Dupont':'e.g. John Smith','Signature (ajoutée à chaque nouveau message)':'Signature (added to every new message)','Ta signature…':'Your signature…',
 "Annulation de l'envoi":'Undo send','Délai pendant lequel « Annuler » reste possible':'How long “Undo” stays available','Désactivée':'Off',
@@ -882,7 +906,7 @@ const I18N_EN={
 '« Instantané » garde une connexion ouverte (IMAP IDLE) : le mail est signalé en une seconde. 5 dossiers maximum, les autres sont vérifiés régulièrement.':'“Instant” keeps a connection open (IMAP IDLE): new mail shows up within a second. 5 folders max; the others are checked periodically.',
 'Dossier':'Folder','Notifier':'Notify','Instantané':'Instant','Envois programmés':'Scheduled sends','En attente':'Snoozed','Application':'App','Langue':'Language','Auto (système)':'Auto (system)',
 'Verrouillage':'App lock',"Empreinte, visage ou code du téléphone à l'ouverture":'Fingerprint, face or phone PIN when opening','Mises à jour':'Updates',"Dépôt GitHub qui publie l'APK (propriétaire/nom)":'GitHub repository publishing the APK (owner/name)',
-'utilisateur/free-mail':'user/free-mail','Vérifier':'Check','Diagnostic':'Diagnostics','Actualiser':'Refresh','Copier les journaux':'Copy logs','Journal technique':'Technical log',
+'utilisateur/free-mail':'user/free-mail','Vérifier':'Check','Actualiser':'Refresh','Copier les journaux':'Copy logs','Journal technique':'Technical log',
 'Aucun envoi programmé.':'No scheduled sends.','Aucun mail en attente.':'No snoozed mail.','Envoyer maintenant':'Send now',"Annuler l'envoi":'Cancel sending','Annuler':'Undo',
 'Contenu':'Body','Chercher aussi dans le texte des mails (plus lent)':'Also search the mail text (slower)',"Hors ligne : derniers mails enregistrés sur l'appareil":'Offline: showing the mail saved on this device',
 'Répéter plus tard':'Snooze','Envoyer plus tard':'Send later','Plus tard':'Later','Dans 3 heures':'In 3 hours','Dans 1 heure':'In 1 hour','Ce soir (18:00)':'This evening (6 PM)','Demain matin (08:00)':'Tomorrow morning (8 AM)',
@@ -995,6 +1019,7 @@ const I18N_EN={
 'Copier':'Copy','Copié':'Copied','Fichier':'File','Sur':'Of','et':'and','Dans':'In',
 };
 const I18N_EN_RX=[
+[/^À jour \(v(.+)\)$/,'Up to date (v$1)'],[/^Version (.+) ignorée$/,'Version $1 skipped'],
 [/^([^()]+) \((\d+)\)$/,(m,a,b)=>{ const t=I18N_EN[a.trim()]; return t?`${t} (${b})`:m; }],
 [/^Connecté à la boîte \(IMAP\)$/,'Connected to the mailbox (IMAP)'],[/^(.+) \[(.+)\] : (\d+) mail\(s\) trouvé\(s\), lecture des en-têtes…$/,'$1 [$2]: $3 mail(s) found, reading headers…'],
 [/^(.+) \[(.+)\] : aucun mail$/,'$1 [$2]: no mail'],[/^(.+) : (\d+) mails$/,'$1: $2 mails'],[/^(\d+) dossiers protégés \(destinations de filtres\/règles\)$/,'$1 protected folders (filter/rule destinations)'],
@@ -1174,10 +1199,10 @@ $('#loginBtn').onclick=async()=>{ $('#loginMsg').textContent='Vérification…';
   catch(e){ $('#loginMsg').innerHTML='<span class="chip err">'+esc(e.message)+'</span>'; } };
 $('#logout').onclick=async()=>{ stopPoll(); try{ navigator.serviceWorker?.controller?.postMessage({type:'clear'}); }catch(e){} await api('logout',{}); showLogin('Déconnecté. Session effacée de la mémoire.','ok'); };
 $$('[data-tab]').forEach(b=>b.onclick=()=>tab(b.dataset.tab));
-const TAB_TITLES={mail:'Boîte mail',dash:'Tableau de bord',maint:'Entretien',filters:'Filtres',help:'Aide',settings:'Réglages'};
+const TAB_TITLES={mail:'Boîte mail',dash:'Tableau de bord',maint:'Entretien',filters:'Filtres',help:'Aide',settings:'Réglages',diag:'Diagnostic'};
 function tab(t){ document.body.dataset.tab=t; if($('#mbarTitle')) $('#mbarTitle').textContent=TAB_TITLES[t]||'Free Mail'; $$('[data-tab]').forEach(b=>b.classList.toggle('on',b.dataset.tab===t)); $$('.tab').forEach(s=>s.classList.toggle('hidden',s.id!==t));
   window.scrollTo({top:0,behavior:'smooth'}); $('.main').classList.toggle('full',t==='mail'); if(t==='mail') openMail();
-  if(t==='dash') loadDash(); if(t==='maint') loadMaint(); if(t==='filters') loadFilters(); if(t==='settings') loadSettingsTab(); }
+  if(t==='dash') loadDash(); if(t==='maint') loadMaint(); if(t==='filters') loadFilters(); if(t==='settings') loadSettingsTab(); if(t==='diag') loadDiag(); }
 
 /* ============================================================ charts */
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -2066,9 +2091,10 @@ $('#dAccount').onclick=()=>{ closeDrawer(); window.FMAndroid&&FMAndroid.changeAc
   addEventListener('touchend',e=>{ if(x0===null) return; const t=e.changedTouches[0], dx=t.clientX-x0, dy=Math.abs(t.clientY-y0);
     if(edge&&dx>60&&dy<50&&isPhone()) openDrawer(); else if(document.body.classList.contains('drawer-open')&&dx<-60&&dy<50) closeDrawer(); x0=null; },{passive:true}); })();
 /* ---- deep links (#m=<folder>&u=<uid>, #compose), Android back button */
-function parseHash(){ const h=new URLSearchParams(location.hash.slice(1)); return {m:h.get('m'),u:h.get('u'),compose:h.has('compose'),to:h.get('to')}; }
-async function handleDeepLink(){ if($('#app').classList.contains('hidden')) return; const d=parseHash(); if(!d.m&&!d.compose) return;
+function parseHash(){ const h=new URLSearchParams(location.hash.slice(1)); return {m:h.get('m'),u:h.get('u'),compose:h.has('compose'),to:h.get('to'),update:h.has('update'),go:h.get('go')==='1'}; }
+async function handleDeepLink(){ if($('#app').classList.contains('hidden')) return; const d=parseHash(); if(!d.m&&!d.compose&&!d.update) return;
   history.replaceState(null,'',location.pathname);
+  if(d.update){ UPD_SHOWN=true; runUpdateCheck({install:d.go}); return; }
   if(d.compose){ tab('mail'); await compose('new'); if(d.to) setRcpt('to',[d.to]); return; }
   if(document.body.classList.contains('drawer-open')) closeDrawer();
   if($('#compose').classList.contains('on')) $('#compose').classList.add('min');
@@ -2193,7 +2219,7 @@ function startPoll(){ if(MB.timer) return; PREV=null; pollMail(); MB.timer=setIn
 function stopPoll(){ clearInterval(MB.timer); MB.timer=null; PREV=null; document.title='Free Mail Manager'; const fv=$('#favicon'); if(fv) fv.href=favSvg(0); }
 /* ============================================================ settings, undo send, scheduled send, snooze, swipe, contacts */
 const SNOOZE_FOLDER='En attente';
-let SET={from_name:'',signature:'',notify_off:[],quiet:{on:false,start:'22:00',end:'07:00'},push_folders:['INBOX'],update_repo:'',undo_seconds:8};
+let SET={from_name:'',signature:'',notify_off:[],quiet:{on:false,start:'22:00',end:'07:00'},push_folders:['INBOX'],update_skip:'',undo_seconds:8};
 async function loadSettings(){ try{ SET=await api('settings'); }catch(e){} return SET; }
 let SET_PATCH={}, SET_T=null, SET_P=null;
 function saveSettings(patch){ Object.assign(SET,patch); Object.assign(SET_PATCH,patch); clearTimeout(SET_T);
@@ -2330,11 +2356,11 @@ async function loadSettingsTab(){
   await loadSettings();
   $('#sName').value=SET.from_name||''; $('#sSig').innerHTML=SET.signature||''; $('#sUndo').value=String(SET.undo_seconds??8);
   $('#sQuiet').checked=!!SET.quiet?.on; $('#sQStart').value=SET.quiet?.start||'22:00'; $('#sQEnd').value=SET.quiet?.end||'07:00';
-  $('#sQuietT').style.opacity=SET.quiet?.on?1:.5; $('#sRepo').value=SET.update_repo||''; $('#sVer').textContent=appVersion()||'';
+  $('#sQuietT').style.opacity=SET.quiet?.on?1:.5; showUpdateState(); $('#sVer').textContent=appVersion()||'';
   try{ $('#sLang').value=localStorage.getItem('fm-lang')||''; }catch(e){}
   try{ if(window.FMAndroid&&FMAndroid.lockAvailable&&FMAndroid.lockAvailable()){ $('#sLockRow').classList.remove('hidden'); $('#sLock').checked=FMAndroid.lockEnabled(); } }catch(e){}
   if(!MB.folders.length){ try{ MB.folders=await api('mail/folders'); }catch(e){} }
-  renderSetFolders(); loadQueues(); loadDiag(); }
+  renderSetFolders(); loadQueues(); }
 function renderSetFolders(){
   const fs=MB.folders.filter(f=>f.selectable&&!MUTE_ROLES.includes(f.role)&&f.name!==SNOOZE_FOLDER);
   const off=new Set(SET.notify_off||[]), push=new Set(SET.push_folders||[]);
@@ -2351,7 +2377,6 @@ $('#sSig').addEventListener('paste',e=>{ const h=e.clipboardData.getData('text/h
 $('#sUndo').onchange=()=>saveSettings({undo_seconds:+$('#sUndo').value});
 const saveQuiet=()=>{ $('#sQuietT').style.opacity=$('#sQuiet').checked?1:.5; saveSettings({quiet:{on:$('#sQuiet').checked,start:$('#sQStart').value||'22:00',end:$('#sQEnd').value||'07:00'}}); };
 ['#sQuiet','#sQStart','#sQEnd'].forEach(id=>$(id).onchange=saveQuiet);
-$('#sRepo').onchange=()=>saveSettings({update_repo:$('#sRepo').value.trim().replace(/^https?:\/\/github\.com\//i,'').replace(/\.git$|\/$/g,'')});
 $('#sLock').onchange=()=>{ let r='ok'; try{ r=FMAndroid.setLock($('#sLock').checked); }catch(e){ r=String(e); }
   if(r!=='ok'){ toast(r,'err'); $('#sLock').checked=!$('#sLock').checked; } else toast($('#sLock').checked?'Verrouillage activé':'Verrouillage désactivé'); };
 async function loadQueues(){ let a={items:[]}, b={items:[]};
@@ -2385,27 +2410,49 @@ async function loadDiag(){ let d;
   const log=(d.log||[]).map(x=>`${new Date(x.t*1000).toISOString().slice(5,19).replace('T',' ')} ${x.level==='info'?'':x.level.toUpperCase()+' '}${x.msg}`).join('\n');
   $('#sLog').textContent=log||'…'; $('#sLog').scrollTop=1e9;
   DIAG_TEXT=`Free Mail diagnostics ${new Date().toISOString()}\n`+rows.map(([k,v])=>`${k}: ${v}`).join('\n')+'\n\n'+log; }
-$('#sDiagR').onclick=()=>{ loadDiag(); loadQueues(); };
+$('#sDiagR').onclick=()=>loadDiag();
+if((window.FMAndroid&&FMAndroid.share)||navigator.share) $('#sShare').classList.remove('hidden');
+$('#sShare').onclick=async()=>{ if(!DIAG_TEXT) await loadDiag(); if(!DIAG_TEXT) return;
+  try{ if(window.FMAndroid&&FMAndroid.share){ FMAndroid.share('Free Mail diagnostics',DIAG_TEXT); return; } await navigator.share({title:'Free Mail diagnostics',text:DIAG_TEXT}); }catch(e){} };
 $('#sCopy').onclick=async()=>{ if(!DIAG_TEXT) await loadDiag(); if(!DIAG_TEXT){ toast('Rien à copier','err'); return; }
   let ok=false; try{ if(window.FMAndroid&&FMAndroid.copy) ok=FMAndroid.copy(DIAG_TEXT)==='ok'; }catch(e){}
   if(!ok) try{ await navigator.clipboard.writeText(DIAG_TEXT); ok=true; }catch(e){}
   if(!ok){ const ta=document.createElement('textarea'); ta.value=DIAG_TEXT; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{ ok=document.execCommand('copy'); }catch(e){} ta.remove(); }
   toast(ok?'Journaux copiés':'Copie impossible : sélectionne le journal à la main',ok?'ok':'err'); };
 
-/* ---- updates (GitHub releases): check from Settings, and once a day in the background */
-async function checkUpdate(){ await flushSettings(); return api('update?repo='+encodeURIComponent(SET.update_repo||'')); }
-function installUpdate(r){ if(window.FMAndroid&&FMAndroid.installUpdate&&r.apk){ let res='ok'; try{ res=FMAndroid.installUpdate(r.apk,r.version||''); }catch(e){ res=String(e); }
+/* ---- updates: the app's own GitHub releases, checked by the server (cached, ETag) */
+let UPD=null, UPD_SHOWN=false;
+async function checkUpdate(force){ UPD=await api('update'+(force?'?force=1':'')); showUpdateState(); return UPD; }
+function showUpdateState(){ const c=$('#sVerCur'), l=$('#sVerLast'); if(!c) return;
+  c.textContent=UPD?.current?('v'+UPD.current):(appVersion()||'—'); l.textContent=UPD?.version?('v'+UPD.version):'—'; }
+function installUpdate(r){ closeUpdateDialog();
+  if(window.FMAndroid&&FMAndroid.installUpdate&&r.apk){ let res='ok'; try{ res=FMAndroid.installUpdate(r.apk,r.version||''); }catch(e){ res=String(e); }
     res==='ok'?toast('Téléchargement de la mise à jour…'):toast(res,'err',8000); }
   else openExt(r.url||r.apk); }
-$('#sUpd').onclick=async()=>{ const b=$('#sUpd'), out=$('#sUpdRes'); busy(b,true,''); out.innerHTML='';
-  try{ const r=await checkUpdate();
-    if(!r.configured) out.innerHTML='<span class="muted">Renseigne le dépôt GitHub (propriétaire/nom).</span>';
-    else if(!r.available) out.innerHTML=`<span class="chip ok">À jour (v${esc(r.current)})</span>`;
-    else { out.innerHTML=`<span class="chip acc">v${esc(r.version)} disponible</span><button class="btn xs primary" id="sInstall">${I('dl','sm')}Installer</button>`; $('#sInstall').onclick=()=>installUpdate(r); } }
-  catch(e){ out.innerHTML='<span class="chip err">'+esc(e.message)+'</span>'; } finally{ busy(b,false); } };
-async function autoUpdateCheck(){ if(!SET.update_repo) return; let last=0; try{ last=+localStorage.getItem('fm-updchk')||0; }catch(e){}
-  if(Date.now()-last<20*3600e3) return; try{ localStorage.setItem('fm-updchk',String(Date.now())); }catch(e){}
-  try{ const r=await checkUpdate(); if(r.available) toast(`Nouvelle version ${r.version} disponible`,'ok',15000,{label:'Installer',fn:()=>installUpdate(r)}); }catch(e){} }
+function closeUpdateDialog(){ document.querySelector('.upd-scrim')?.remove(); }
+function showUpdateDialog(r){ closeUpdateDialog(); UPD_SHOWN=true;
+  const d=document.createElement('div'); d.className='upd-scrim'; d.setAttribute('role','dialog'); d.setAttribute('aria-modal','true');
+  d.innerHTML=`<div class="upd-box"><div class="hd"><div class="chip-ic">${I('dl')}</div><div><h3>Nouvelle version disponible</h3>
+      <div class="sub"><span translate="no">v${esc(r.current)} → v${esc(r.version)}</span></div></div></div>
+    ${r.notes?`<div class="notes" translate="no">${esc(r.notes)}</div>`:''}
+    <div class="ft"><button class="btn ghost xs skip" data-u="skip">Ignorer cette version</button><button class="btn" data-u="later">Plus tard</button>
+      <button class="btn primary" data-u="go">${I('dl','sm')}Mettre à jour</button></div></div>`;
+  document.body.appendChild(d);
+  d.onclick=e=>{ if(e.target===d) closeUpdateDialog(); };
+  d.querySelector('[data-u=later]').onclick=closeUpdateDialog;
+  d.querySelector('[data-u=go]').onclick=()=>installUpdate(r);
+  d.querySelector('[data-u=skip]').onclick=async()=>{ closeUpdateDialog(); try{ await api('update/skip',{version:r.version}); toast(`Version ${r.version} ignorée`); }catch(e){ toast('Erreur : '+e.message,'err'); } }; }
+async function runUpdateCheck(opts={}){ const btns=$$('[data-check-update]'); btns.forEach(b=>b.disabled=true);
+  const out=$('#sUpdRes'); if(out) out.innerHTML='<span class="spin"></span>';
+  try{ const r=await checkUpdate(true); if(out) out.innerHTML='';
+    if(r.available){ if(opts.install&&r.apk) installUpdate(r); else showUpdateDialog(r); }
+    else { const m=`À jour (v${r.current})`; if(out) out.innerHTML=`<span class="chip ok">${esc(m)}</span>`; toast(m); } }
+  catch(e){ if(out) out.innerHTML='<span class="chip err">'+esc(e.message)+'</span>'; toast('Erreur : '+e.message,'err'); }
+  finally{ btns.forEach(b=>b.disabled=false); } }
+$$('[data-check-update]').forEach(b=>b.onclick=()=>{ if(b.closest('#drawer')) closeDrawer(); runUpdateCheck(); });
+// at startup: the server answers from its cache (refreshed every few hours), so this costs nothing
+async function autoUpdateCheck(){ try{ const r=await checkUpdate(false); if(r.available&&!r.skipped&&!UPD_SHOWN) showUpdateDialog(r); }catch(e){} }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeUpdateDialog(); });
 
 /* ============================================================ boot */
 (async()=>{ if(!TOKEN){ document.body.innerHTML='<div style="display:grid;place-items:center;height:100vh;padding:16px"><div class="issue error" style="max-width:460px">'+I('alert')+'<div>Jeton manquant : ouvre l\'URL affichée dans le terminal par <code>./webui.py</code></div></div></div>'; return; }
