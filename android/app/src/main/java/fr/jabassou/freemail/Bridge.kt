@@ -19,6 +19,8 @@ import androidx.core.content.ContextCompat
 object Bridge {
     const val CH_MAIL = "mail"
     const val CH_QUIET = "mail_quiet"
+    const val CH_UPDATE = "updates"
+    const val UPDATE_ID = 43
     const val CH_SERVICE = "status"
     const val STATUS_ID = 42
     const val ACCENT = 0xFF7C3AED.toInt()
@@ -43,6 +45,12 @@ object Bridge {
                 description = app.getString(R.string.ch_quiet_desc)
                 enableVibration(false)
                 setSound(null, null)
+            }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CH_UPDATE, app.getString(R.string.ch_update), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = app.getString(R.string.ch_update_desc)
+                setShowBadge(false)
             }
         )
         nm.deleteNotificationChannel("service") // v1 channel (hidden from the status bar)
@@ -154,6 +162,33 @@ object Bridge {
             )
         }
         NotificationManagerCompat.from(app).notify(id, b.build())
+    }
+
+    /** New app release (announced once per version by the Python notifier). Tap = details, button = install. */
+    @JvmStatic
+    @SuppressLint("MissingPermission")
+    fun notifyUpdate(version: String, title: String, body: String) {
+        if (!canNotify()) return
+        fun open(go: Boolean, req: Int) = PendingIntent.getActivity(
+            app, req,
+            Intent(app, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("update", if (go) "install" else "show")
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        val n = NotificationCompat.Builder(app, CH_UPDATE)
+            .setSmallIcon(R.drawable.ic_stat_mail)
+            .setColor(ACCENT)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setContentIntent(open(false, 9001))
+            .addAction(0, app.getString(R.string.action_update), open(true, 9002))
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .build()
+        NotificationManagerCompat.from(app).notify(UPDATE_ID, n)
     }
 
     /** Replaces a notification by a short confirmation after an inline reply (stops the reply spinner). */

@@ -859,11 +859,14 @@ class Handler(BaseHTTPRequestHandler):
         return r
 
     def api_get_update(self, a):
-        repo = (a.get("repo") or extras.get_settings().get("update_repo") or "").strip()
         try:
-            return extras.check_update(repo, APP_VERSION)
+            return extras.check_update(APP_VERSION, force=a.get("force") == "1")
         except mailweb.MailError as e:
             raise ApiError(502, str(e)) from None
+
+    def api_post_update_skip(self, a):
+        extras.save_settings({"update_skip": a.get("version", "")})
+        return {"ok": True, "skipped": extras.get_settings()["update_skip"]}
 
     def api_post_mail_snooze(self, a):
         r = mail(lambda mb: extras.snooze(mb, a["folder"], a["uids"], a["until"]))
@@ -1156,6 +1159,7 @@ class Notifier(threading.Thread):
         self.sync_idle()
         while True:
             self.check_now(fresh=False)
+            self.check_update()
             self.wake.wait(self.interval)
             self.wake.clear()
 
@@ -1264,6 +1268,27 @@ class Notifier(threading.Thread):
                    "--action", f"termux-open-url {shlex.quote(self._url(it['folder'], it['uid']))}",
                    "--button1", "Marquer lu", "--button1-action", mark,
                    "--button2", "Ouvrir", "--button2-action", f"termux-open-url {shlex.quote(self._url(it['folder'], it['uid']))}"])
+
+    def check_update(self):
+        """Announce a new app release once (GitHub API checked every few hours, cached)."""
+        r = extras.update_to_announce(APP_VERSION)
+        if not r:
+            return
+        title = _L(f"Free Mail {r['version']} est disponible", f"Free Mail {r['version']} is available")
+        body = _L("Touchez pour mettre à jour.", "Tap to update.")
+        try:
+            if self.mode == "android":
+                from java import jclass
+                jclass("fr.jabassou.freemail.Bridge").notifyUpdate(r["version"], title, body)
+            elif self.mode == "termux":
+                import shlex
+                url = f"http://127.0.0.1:{self.port}/#update"
+                self._run(["--id", "freemail-update", "--title", title, "--content", body, "--icon", "system_update",
+                           "--action", f"termux-open-url {shlex.quote(url)}"])
+            else:
+                self._run([title])
+        except Exception as e:  # noqa: BLE001
+            extras.diag_exc("update notification", e)
 
     def notify_summary(self, n: int, folders: list[str]):
         import shlex
