@@ -2450,8 +2450,8 @@ async function runUpdateCheck(opts={}){ const btns=$$('[data-check-update]'); bt
   catch(e){ if(out) out.innerHTML='<span class="chip err">'+esc(e.message)+'</span>'; toast('Erreur : '+e.message,'err'); }
   finally{ btns.forEach(b=>b.disabled=false); } }
 $$('[data-check-update]').forEach(b=>b.onclick=()=>{ if(b.closest('#drawer')) closeDrawer(); runUpdateCheck(); });
-// at startup: the server answers from its cache (refreshed every few hours), so this costs nothing
-async function autoUpdateCheck(){ try{ const r=await checkUpdate(false); if(r.available&&!r.skipped&&!UPD_SHOWN) showUpdateDialog(r); }catch(e){} }
+// at startup: fresh conditional request (ETag), a release published since the last check is seen right away
+async function autoUpdateCheck(){ try{ const r=await checkUpdate(true); if(r.available&&!r.skipped&&!UPD_SHOWN) showUpdateDialog(r); }catch(e){} }
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeUpdateDialog(); });
 
 /* ============================================================ boot */
