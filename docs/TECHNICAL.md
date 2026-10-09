@@ -111,6 +111,7 @@ source .venv/bin/activate
 `mailweb.py` turns the web UI into a full mail client:
 
 - folder tree with unread counts, drag & drop messages onto folders
+- **New** (top of the folder tree): unread mail of every folder, one collapsible block per folder (3 most recent, "Show N more" expands in place), periods Today / Since last visit / All, per-folder and global "Mark read" with undo; Sent, Drafts, Trash, Spam, the snooze folder and folders muted in Settings are left out (`/api/mail/new`, `/api/mail/new/read`, deep link `#new`). The "Folders" section of the tree can be collapsed (remembered on the device).
 - message list: newest first (IMAP SORT), 50 per page with infinite scroll, search (sender/subject/recipient, accents via TEXT), filters (unread, flagged, attachments), multi-select bulk actions
 - reader: HTML rendered in a sandboxed iframe (no scripts, strict CSP), remote images blocked until allowed, inline `cid:` images, attachment download, one-click unsubscribe, "Filter" opens the filter wizard
 - actions: reply / reply all / forward, star, unread, move, delete (Trash; permanent when already in Trash)

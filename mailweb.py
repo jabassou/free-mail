@@ -299,6 +299,73 @@ def list_messages(mb: fm.Mailbox, folder: str, page: int = 0, q: str = "", filt:
             "pages": max(1, -(-len(uids) // PAGE)), "items": items}
 
 
+# --------------------------------------------------------------------------- new mail, all folders
+NEW_SKIP_ROLES = {"sent", "drafts", "trash", "junk"}
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _unseen_since(mb: fm.Mailbox, since: float) -> list[str]:
+    """UIDs of the unread mails of the selected folder that arrived after `since` (epoch s, 0 = all), newest first."""
+    crit = "UNSEEN"
+    if since:
+        d = time.localtime(since)
+        crit += f" SINCE {d.tm_mday:02d}-{_MONTHS[d.tm_mon - 1]}-{d.tm_year}"  # day granularity, refined below
+    if "SORT" in mb.caps:  # same order as the folder list
+        typ, dat = mb.M.uid("SORT", "(REVERSE ARRIVAL)", "UTF-8", crit)
+        uids = dat[0].decode().split() if typ == "OK" and dat and dat[0] else []
+    else:
+        typ, dat = mb.M.uid("SEARCH", crit)
+        uids = sorted(dat[0].decode().split(), key=int, reverse=True) if typ == "OK" and dat and dat[0] else []
+    if since and uids:
+        typ, dat = mb.M.uid("FETCH", ",".join(uids), "(INTERNALDATE)")
+        keep = set()
+        for it in dat if typ == "OK" else []:
+            line = it[0] if isinstance(it, tuple) else it
+            if not isinstance(line, bytes):
+                continue
+            uid, idate = re.search(rb"UID (\d+)", line), imaplib.Internaldate2tuple(line)
+            if uid and idate and time.mktime(idate) >= since:
+                keep.add(uid.group(1).decode())
+        uids = [u for u in uids if u in keep]
+    return uids
+
+
+def new_mail(mb: fm.Mailbox, since: float = 0, per: int = 3, only: str | None = None, skip=()) -> dict:
+    """The "New" view: unread mail of every folder, one group per folder (Inbox first, then the busiest).
+    Counts are complete; only the `per` most recent messages of each group are fetched."""
+    groups = []
+    for f in folders(mb):
+        if not f["selectable"] or not f["unseen"] or f["role"] in NEW_SKIP_ROLES or f["name"] in skip:
+            continue
+        if only is not None and f["name"] != only:
+            continue
+        mb.select(mb.resolve(f["name"]))
+        uids = _unseen_since(mb, since)
+        if not uids:
+            continue
+        items = []
+        top = uids[:max(1, per)]
+        typ, dat = mb.M.uid("FETCH", ",".join(top), _LIST_ITEMS)
+        if typ == "OK":
+            by = {m["uid"]: m for m in _parse_list_fetch(dat)}
+            items = [by[u] for u in top if u in by]
+        groups.append({"folder": f["name"], "role": f["role"], "unseen": f["unseen"], "count": len(uids), "items": items})
+    groups.sort(key=lambda g: (g["role"] != "inbox", -g["count"], g["folder"].lower()))
+    return {"since": since, "total": sum(g["count"] for g in groups), "groups": groups}
+
+
+def mark_new_read(mb: fm.Mailbox, names: list[str], since: float = 0) -> dict:
+    """Mark read what the "New" view shows for these folders (only mails after `since`), return the UIDs for undo."""
+    marked = {}
+    for name in names:
+        mb.select(mb.resolve(name), readonly=False)
+        uids = _unseen_since(mb, since)
+        if uids:
+            mb.M.uid("STORE", ",".join(uids), "+FLAGS.SILENT", r"(\Seen)")
+            marked[name] = uids
+    return {"marked": marked, "count": sum(len(v) for v in marked.values())}
+
+
 # --------------------------------------------------------------------------- read
 def _fetch_raw(mb: fm.Mailbox, uid: str) -> tuple[bytes, list[str]]:
     typ, d = mb.M.uid("FETCH", uid, "(FLAGS RFC822.SIZE)")

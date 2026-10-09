@@ -131,3 +131,29 @@ def test_bad_token_is_refused(server):
         raise AssertionError("should be refused")
     except urllib.error.HTTPError as e:
         assert e.code == 403
+
+
+def test_new_mail_view(server, imap):
+    server("settings", {"notify_off": ["Muted"]})
+    time.sleep(1.1)
+    t0 = int(time.time())  # INTERNALDATE has 1 s resolution: mails put from now on are >= t0
+    alert = imap.put(folder="Jobs/Alerts", subject=f"new view alert {uuid.uuid4().hex[:6]}")
+    inbox = imap.put(folder="INBOX", subject=f"new view inbox {uuid.uuid4().hex[:6]}")
+    imap.put(folder="Muted", subject="new view muted")
+    imap.put(folder="Trash", subject="new view trash")
+    d = server(f"mail/new?since={t0}&per=3")
+    groups = {g["folder"]: g for g in d["groups"]}
+    assert "Muted" not in groups and "Trash" not in groups, "muted folders and Trash/Spam/Sent/Drafts are left out"
+    assert d["groups"][0]["folder"] == "INBOX" and groups["INBOX"]["items"][0]["subject"] == inbox
+    assert [x["subject"] for x in groups["Jobs/Alerts"]["items"]] == [alert]
+    assert d["total"] == sum(g["count"] for g in d["groups"])
+    assert server(f"mail/new?since={t0 + 3600}")["total"] == 0
+    assert server("mail/new?since=0")["total"] >= d["total"]
+    assert len(server("mail/new?since=0&per=1&folder=INBOX")["groups"]) == 1
+    server("mail/new?since=abc", status=400)
+    # "mark read" only touches what the view shows, and returns the UIDs for undo
+    r = server("mail/new/read", {"folders": ["Jobs/Alerts"], "since": t0})
+    assert r["count"] == 1 and imap.find("Jobs/Alerts", alert)[0][1] is True
+    assert imap.find("INBOX", inbox)[0][1] is False
+    server("mail/flag", {"folder": "Jobs/Alerts", "uids": r["marked"]["Jobs/Alerts"], "flag": "seen", "on": False})
+    assert imap.find("Jobs/Alerts", alert)[0][1] is False
