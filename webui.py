@@ -776,6 +776,25 @@ class Handler(BaseHTTPRequestHandler):
         return mail(lambda mb: mailweb.list_messages(mb, a.get("folder", "INBOX"), int(a.get("page", 0)),
                                                      a.get("q", ""), a.get("filter", "")))
 
+    def api_get_mail_new(self, a):
+        try:
+            since, per = max(0.0, float(a.get("since") or 0)), min(max(int(a.get("per") or 3), 1), 200)
+        except ValueError:
+            raise ApiError(400, _L("Paramètres invalides", "Invalid parameters")) from None
+        skip = set(extras.get_settings()["notify_off"]) | {extras.SNOOZE_FOLDER}
+        return mail(lambda mb: mailweb.new_mail(mb, since, per, a.get("folder") or None, skip))
+
+    def api_post_mail_new_read(self, a):
+        names = [str(n) for n in (a.get("folders") or []) if n][:100]
+        try:
+            since = max(0.0, float(a.get("since") or 0))
+        except (TypeError, ValueError):
+            raise ApiError(400, _L("Paramètres invalides", "Invalid parameters")) from None
+        res = mail(lambda mb: mailweb.mark_new_read(mb, names, since))
+        for f, uids in res["marked"].items():
+            seen_on_device(f, uids)
+        return res
+
     def api_get_mail_msg(self, a):
         m = mail(lambda mb: mailweb.get_message(mb, a["folder"], a["uid"], a.get("seen", "1") == "1"))
         if a.get("seen", "1") == "1":

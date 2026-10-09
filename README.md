@@ -34,7 +34,7 @@ Read, write and tidy up your mail in a clean, fast app with real notifications.
 </tr>
 </table>
 
-**Also included:** new-mail notifications with *Mark as read* and *Reply* buttons · snooze a mail until later · one-click unsubscribe · conversations view · fingerprint / face lock · English and French · works offline with the last mails you read.
+**Also included:** a **New** view with the unread mail of every folder in one place · new-mail notifications with *Mark as read* and *Reply* buttons · snooze a mail until later · one-click unsubscribe · conversations view · fingerprint / face lock · English and French · works offline with the last mails you read.
 
 **Private by design:** the app talks directly to Free's servers. Your password is stored encrypted on your phone and never sent anywhere else. No account, no ads, no tracking.
 
