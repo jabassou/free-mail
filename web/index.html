@@ -309,6 +309,27 @@ details summary::before{content:"›";font-size:16px;line-height:1;transition:tr
 .fitem .lab{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fitem .cnt{font-size:11.5px;font-weight:700;color:var(--accent)}.fitem .tw-btn{width:16px;display:grid;place-items:center;color:var(--faint);transition:transform .2s}.fitem .tw-btn.open{transform:rotate(90deg)}
 .fsec{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:700;margin:14px 10px 4px}
+.fsec.tg{display:flex;align-items:center;gap:6px;border:0;background:none;font-family:inherit;cursor:pointer;width:calc(100% - 20px);padding:2px 0;text-align:left}
+.fsec.tg:hover{color:var(--muted)}.fsec.tg .tw-btn{width:14px;display:grid;place-items:center;transition:transform .2s}.fsec.tg .tw-btn.open{transform:rotate(90deg)}
+.fsec.tg .cnt{margin-left:auto;color:var(--accent);letter-spacing:0;font-size:11.5px}
+.fitem.newf{font-weight:700;color:var(--accent);background:linear-gradient(135deg,rgba(124,92,255,.09),rgba(6,182,212,.09));margin-bottom:4px}
+.fitem.newf.on{background:linear-gradient(135deg,rgba(124,92,255,.2),rgba(6,182,212,.2))}
+.fitem.newf .pill{margin-left:auto;background:var(--grad);color:#fff;border-radius:999px;font-size:11px;padding:1px 8px;font-weight:700}
+body.newview #mList .search,body.newview #mFilters,body.newview #mThreads{display:none}
+.mbacknew{display:none;align-self:flex-start;border:0;background:var(--accent-soft);color:var(--accent);font:inherit;font-size:12px;font-weight:650;border-radius:999px;padding:4px 10px 4px 6px;cursor:pointer;align-items:center;gap:4px}
+.mbacknew.on{display:inline-flex}.mbacknew .ic{transform:rotate(180deg)}
+.nseg{display:flex;background:var(--surface2);border-radius:10px;padding:3px;gap:2px;margin:10px 12px 2px}
+.nseg button{flex:1;border:0;background:none;font:inherit;font-size:12px;padding:6px 4px;border-radius:8px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.nseg button.on{background:var(--surface);color:var(--ink);font-weight:650;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.nall{display:flex;gap:6px;justify-content:flex-end;padding:8px 12px 0}
+.ngrp{margin:10px 12px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.ngh{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 10px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+.ngrp.closed .ngh{border-bottom:0}.ngh .tw-btn{width:14px;display:grid;place-items:center;color:var(--faint);transition:transform .2s}.ngh .tw-btn.open{transform:rotate(90deg)}
+.ngh b{font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ngh .ncnt{background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:11.5px;border-radius:999px;padding:1px 8px;flex:none}
+.ngh .sp{flex:1}
+.ngrp .mrow{grid-template-columns:34px 1fr;padding-left:20px}.ngrp .mrow:last-child{border-bottom:0}
+.nmore{display:block;width:100%;border:0;border-top:1px solid var(--line);background:var(--surface2);color:var(--accent);font:inherit;font-size:12px;font-weight:650;padding:9px;cursor:pointer}
 .mlist{border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--surface)}
 .mlist-h{padding:14px 14px 10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
 .mlist-h h2{margin:0;font-size:18px;letter-spacing:-.01em}
@@ -665,6 +686,7 @@ details summary::before{content:"›";font-size:16px;line-height:1;transition:tr
         </aside>
         <div class="mlist" id="mList">
           <div class="mlist-h">
+            <button class="mbacknew" id="mBackNew"><svg class="ic sm"><use href="#i-chev"/></svg>Nouveaux</button>
             <div class="row" style="flex-wrap:nowrap;gap:6px"><button class="iconbtn burger" data-burger title="Dossiers et menu" aria-label="Menu"><svg class="ic"><use href="#i-menu"/></svg></button><h2 class="grow" id="mTitle" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Boîte de réception</h2><span class="tiny muted" id="mCount" style="white-space:nowrap"></span><button class="iconbtn" id="mThreads" title="Affichage par conversation"><svg class="ic sm"><use href="#i-thread"/></svg></button><button class="iconbtn" id="mRefresh" title="Actualiser (R)"><svg class="ic sm"><use href="#i-refresh"/></svg></button></div>
             <select class="msel" id="mFolderSel"></select>
             <div class="search"><svg class="ic sm"><use href="#i-search"/></svg><input id="mSearch" placeholder="Rechercher (expéditeur, sujet…)" style="width:100%"></div>
@@ -921,7 +943,7 @@ const I18N_EN={
 // navigation / shell
 'Boîte mail':'Mail','Tableau de bord':'Dashboard','Entretien':'Maintenance','Filtres':'Filters','Aide':'Help','Thème':'Theme','Thème auto':'Auto theme','Thème clair':'Light theme','Thème sombre':'Dark theme','Déconnexion':'Sign out','Session active':'Session active','Compte Free':'Free account','Dossiers et menu':'Folders and menu','Menu':'Menu','Manager':'Manager',
 'Boîte de réception':'Inbox','Réception':'Inbox','Envoyés':'Sent','Brouillons':'Drafts','Corbeille':'Trash','Spam':'Spam','Archives':'Archive','Dossiers':'Folders','Dossier':'Folder','Notifications':'Notifications','Son':'Sound','Alerte bureau':'Desktop alerts','Tester le son':'Test sound',
-'Replier':'Collapse','Déplier':'Expand','non lus dans les sous-dossiers':'unread in subfolders',
+'Replier':'Collapse','Déplier':'Expand','Nouveaux':'New','non lus dans les sous-dossiers':'unread in subfolders',
 // login
 'Bon retour 👋':'Welcome back 👋','Connecte-toi : l\'outil ouvre ta session webmail Free à ta place.':'Sign in: the app opens your Free webmail session for you.','Identifiant':'Username','Mot de passe Free':'Free password','Laisser vide = mot de passe du trousseau macOS':'Leave empty = password from the macOS Keychain','Mot de passe Free (vide = mot de passe enregistré)':'Free password (empty = saved password)','Se connecter':'Sign in','Boîte mail seulement (sans les filtres serveur)':'Mailbox only (without server filters)',
 'Le mot de passe vient du trousseau macOS ou de ce champ, jamais écrit sur disque. La connexion passe par ton Chrome en mode invisible (5 à 15 s).':'The password comes from the macOS Keychain or this field and is never written to disk. Sign-in runs through a hidden Chrome window (5 to 15 s).',
@@ -1634,6 +1656,65 @@ const addrs=l=>(l||[]).map(a=>a.name?`${esc(a.name)} <span class="muted">&lt;${e
 
 async function openMail(){ $('.main').classList.add('full'); await loadFolders(); if(!MB.items.length) await loadList(true); }
 const MUTE_ROLES=['sent','drafts','trash','junk'];
+// ---- "New": unread mail of every folder, one block per folder
+const NEWV='__new__', SEC_KEY=':sec:folders', L2=(fr,en)=>LANG==='fr'?fr:en;
+const lsGet=(k,d)=>{ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }, lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
+const NEW={period:lsGet('fm-newp','visit'),data:null,more:{},closed:new Set((()=>{ try{ return JSON.parse(lsGet('fm-newc','[]')); }catch(e){ return []; } })()),seq:0};
+const midnight=()=>{ const d=new Date(); d.setHours(0,0,0,0); return d.getTime()/1000; };
+// "since my last visit" = when the app was last left after being looked at for more than 10 s
+let VISIT_SINCE=+lsGet('fm-lastseen',0)||midnight(), SHOWN_AT=Date.now();
+const markLeft=()=>{ if(Date.now()-SHOWN_AT>10000) lsSet('fm-lastseen',String(Date.now()/1000)); };
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) return markLeft();
+  SHOWN_AT=Date.now(); VISIT_SINCE=+lsGet('fm-lastseen',0)||VISIT_SINCE; if(MB.folder===NEWV&&!$('#mail').classList.contains('hidden')) loadNew(false); });
+addEventListener('pagehide',markLeft);
+const newSince=()=>NEW.period==='all'?0:NEW.period==='today'?midnight():VISIT_SINCE;
+const fPath=f=>{ const p=f.depth&&f.parent?folderByName(f.parent):null; return (p?fLabel(p)+' › ':'')+fLabel(f); };
+function setFilter(v){ MB.filter=v; $$('[data-mf]').forEach(x=>x.classList.toggle('on',(x.dataset.mf||'')===v)); }
+function leaveNewCtx(){ if(MB.backNew){ MB.backNew=false; setFilter(''); } }
+const nsegHtml=()=>`<div class="nseg">${[['today',L2("Aujourd'hui",'Today')],['visit',L2('Depuis ma visite','Since last visit')],['all',L2('Tous','All')]].map(([k,l])=>`<button data-np="${k}" class="${NEW.period===k?'on':''}">${l}</button>`).join('')}</div>`;
+async function loadNew(reset){
+  const seq=++NEW.seq; MB.items=[]; MB.view=[]; MB.gmap=new Map(); MB.sel.clear(); MB.cur=null; updateBulk();
+  $('#mTitle').textContent=L2('Nouveaux','New');
+  if(reset){ $('#mRows').innerHTML=nsegHtml()+Array(5).fill('<div style="padding:12px 14px;display:grid;grid-template-columns:34px 1fr;gap:10px"><div class="sk" style="height:34px"></div><div><div class="sk" style="height:12px;width:60%"></div><div class="sk" style="height:10px;width:85%;margin-top:8px"></div></div></div>').join(''); wireNew(); }
+  try{ const d=await api(`mail/new?since=${Math.floor(newSince())}&per=3`); if(seq!==NEW.seq||MB.folder!==NEWV) return; NEW.data=d; NEW.more={}; renderNew(); }
+  catch(e){ if(seq!==NEW.seq) return; $('#mRows').innerHTML=nsegHtml()+'<div class="issue error" style="margin:12px">'+I('alert')+'<div>'+esc(e.message)+'</div></div>'; wireNew(); }
+}
+function nRow(g,it){ return `<div class="mrow ${it.seen?'':'unseen'}" data-nf="${esc(g.folder)}" data-nu="${it.uid}">${it.seen?'':'<span class="dot"></span>'}${avatar(it.from?.email||it.from?.name)}
+  <div style="min-width:0" translate="no"><div class="mtop"><span class="from">${esc(who(it.from))}</span><span class="flags">${it.attachment?I('clip'):''}</span><span class="date">${mdate(it.date)}</span></div>
+  <div class="subj">${esc(it.subject||'(sans objet)')}</div><div class="snip">${esc(it.snippet||'')}</div></div></div>`; }
+function renderNew(){
+  const d=NEW.data||{groups:[],total:0}, gs=d.groups, nf=gs.length;
+  $('#mCount').textContent=d.total?L2(`${num(d.total)} non lu${d.total>1?'s':''} · ${nf} dossier${nf>1?'s':''}`,`${num(d.total)} unread · ${nf} folder${nf>1?'s':''}`):'';
+  const allClosed=nf&&gs.every(g=>NEW.closed.has(g.folder));
+  const top=nf?`<div class="nall"><button class="btn xs" data-ncoll>${allClosed?L2('Tout déplier','Expand all'):L2('Tout replier','Collapse all')}</button><button class="btn xs primary" data-nall>${I('check','sm')}${L2('Tout marquer lu','Mark all read')}</button></div>`:'';
+  const body=nf?gs.map(g=>{ const f=folderByName(g.folder), closed=NEW.closed.has(g.folder), items=NEW.more[g.folder]||g.items, rest=g.count-items.length;
+      return `<div class="ngrp ${closed?'closed':''}"><div class="ngh" data-ngt="${esc(g.folder)}"><span class="tw-btn ${closed?'':'open'}">${I('chev','sm')}</span>${I(ROLE_IC[g.role]||'folder','sm')}<b translate="no">${esc(f?fPath(f):g.folder)}</b><span class="ncnt">${num(g.count)}</span><span class="sp"></span>
+        <button class="iconbtn" data-nread="${esc(g.folder)}" title="${L2('Marquer lu','Mark read')}">${I('mailopen','sm')}</button><button class="iconbtn" data-nopen="${esc(g.folder)}" title="${L2('Ouvrir le dossier','Open folder')}">${I('ext','sm')}</button></div>
+        ${closed?'':items.map(it=>nRow(g,it)).join('')+(rest>0?`<button class="nmore" data-nmore="${esc(g.folder)}">${L2(`Voir les ${num(rest)} autres`,`Show ${num(rest)} more`)}</button>`:'')}</div>`; }).join('')
+    :`<div class="mempty"><div><div class="big">${I('checkc')}</div><b>${L2('Aucun nouveau mail','No new mail')}</b><div class="small">${NEW.period==='all'?L2('Tout est lu. 🎉','Everything is read. 🎉'):L2('Rien de neuf sur cette période.','Nothing new for this period.')}</div></div></div>`;
+  $('#mRows').innerHTML=nsegHtml()+top+body; wireNew();
+}
+function wireNew(){
+  $$('[data-np]').forEach(b=>b.onclick=()=>{ NEW.period=b.dataset.np; lsSet('fm-newp',NEW.period); loadNew(true); });
+  $$('[data-ngt]').forEach(h=>h.onclick=e=>{ if(e.target.closest('button')) return; const n=h.dataset.ngt; NEW.closed.has(n)?NEW.closed.delete(n):NEW.closed.add(n); lsSet('fm-newc',JSON.stringify([...NEW.closed])); renderNew(); });
+  $$('[data-ncoll]').forEach(b=>b.onclick=()=>{ const gs=NEW.data?.groups||[], close=!gs.every(g=>NEW.closed.has(g.folder)); gs.forEach(g=>close?NEW.closed.add(g.folder):NEW.closed.delete(g.folder)); lsSet('fm-newc',JSON.stringify([...NEW.closed])); renderNew(); });
+  $$('[data-nread]').forEach(b=>b.onclick=()=>newMarkRead([b.dataset.nread]));
+  $$('[data-nall]').forEach(b=>b.onclick=()=>newMarkRead((NEW.data?.groups||[]).map(g=>g.folder)));
+  $$('[data-nopen]').forEach(b=>b.onclick=()=>openFromNew(b.dataset.nopen));
+  $$('[data-nmore]').forEach(b=>b.onclick=async()=>{ const n=b.dataset.nmore, have=(NEW.more[n]||[]).length||3; b.disabled=true;
+    try{ const r=await api(`mail/new?since=${Math.floor(newSince())}&per=${Math.min(200,have+50)}&folder=${encodeURIComponent(n)}`); const g=r.groups[0]; if(g){ NEW.more[n]=g.items; const og=NEW.data.groups.find(x=>x.folder===n); if(og) og.count=g.count; } renderNew(); }
+    catch(e){ b.disabled=false; toast(e.message,'err'); } });
+  $$('#mRows .mrow[data-nu]').forEach(r=>r.onclick=()=>openFromNew(r.dataset.nf,r.dataset.nu));
+}
+async function newMarkRead(names){ if(!names.length) return; let r;
+  try{ r=await api('mail/new/read',{folders:names,since:Math.floor(newSince())}); }catch(e){ toast(e.message,'err'); return; }
+  loadFolders(); loadNew(false);
+  if(r.count) toast(L2(`${num(r.count)} mail${r.count>1?'s':''} marqué${r.count>1?'s':''} lu${r.count>1?'s':''}`,`${num(r.count)} mail${r.count>1?'s':''} marked read`),'ok',5000,{label:'Annuler',fn:async()=>{
+    for(const [f,uids] of Object.entries(r.marked)){ try{ await api('mail/flag',{folder:f,uids,flag:'seen',on:false}); }catch(e){} } loadFolders(); if(MB.folder===NEWV) loadNew(false); }}); }
+// open a folder (unread filter) from the "New" view, optionally a mail in it; the list shows a "← New" chip
+async function openFromNew(folder,uid){ MB.backNew=true; setFilter('unseen'); MB.folder=folder; MB.sel.clear(); MB.cur=null; MB.q=''; $('#mSearch').value='';
+  renderFolders(); await loadList(true); if(uid) MB.gmap.has(uid)?openRow(uid):openMsg(uid); }
+$('#mBackNew').onclick=()=>{ MB.backNew=false; setFilter(''); selectFolder(NEWV); };
 const CLOSED=new Set((()=>{try{return JSON.parse(localStorage.getItem('fm-closed')||'[]')}catch(e){return []}})());
 const saveClosed=()=>{try{localStorage.setItem('fm-closed',JSON.stringify([...CLOSED]))}catch(e){}};
 async function loadFolders(){
@@ -1652,19 +1733,25 @@ function renderFolders(){
       ${k.length?`<span class="tw-btn ${open?'open':''}" data-tw="${esc(f.name)}" title="${open?'Replier':'Déplier'}">${I('chev','sm')}</span>`:'<span class="tw-btn"></span>'}
       ${I(ROLE_IC[f.role]||'folder','sm')}<span class="lab">${esc(fShort(f))}</span>${f.unseen?`<span class="cnt">${num(f.unseen)}</span>`:hidden?`<span class="cnt" style="opacity:.6" title="non lus dans les sous-dossiers">${num(hidden)}</span>`:''}</button>`
       +(k.length&&open?k.map(c=>item(c,lvl+1)).join(''):''); };
-  const tree=sys.map(f=>item(f,0)).join('')+'<div class="fsec">Dossiers</div>'+others.filter(isRoot).map(f=>item(f,0)).join('');
+  const roots=others.filter(isRoot), secOpen=!CLOSED.has(SEC_KEY)||!!MB.q, nNew=totalUnread();
+  const secHidden=secOpen?0:roots.reduce((a,f)=>a+(MUTE_ROLES.includes(f.role)?0:f.unseen)+sub(f.name),0);
+  const newItem=`<button class="fitem newf ${MB.folder===NEWV?'on':''}" data-fold="${NEWV}" title="${L2('Nouveaux mails de tous les dossiers','New mail from every folder')}"><span class="tw-btn"></span>${I('zap','sm')}<span class="lab">${L2('Nouveaux','New')}</span>${nNew?`<span class="pill">${num(nNew)}</span>`:''}</button>`;
+  const tree=newItem+sys.map(f=>item(f,0)).join('')+(roots.length?`<button class="fsec tg" data-fsec title="${secOpen?'Replier':'Déplier'}"><span class="tw-btn ${secOpen?'open':''}">${I('chev','sm')}</span>Dossiers${secHidden?`<span class="cnt">${num(secHidden)}</span>`:''}</button>`+(secOpen?roots.map(f=>item(f,0)).join(''):''):'');
   $('#mFolders').innerHTML=tree+notifPrefsHtml(); $('#dFolders').innerHTML=tree;
-  $('#mFolderSel').innerHTML=MB.folders.filter(f=>f.selectable).map(f=>`<option value="${esc(f.name)}" ${f.name===MB.folder?'selected':''}>${'— '.repeat(f.depth)}${esc(fLabel(f))}${f.unseen?` (${f.unseen})`:''}</option>`).join('');
-  $$('[data-fold]').forEach(b=>{ b.onclick=e=>{ if(e.target.closest('[data-tw]')) return; if(b.dataset.nosel){ const t=b.querySelector('[data-tw]'); t&&t.click(); return; } if(b.closest('#drawer')){ closeDrawer(); if(document.body.dataset.tab!=='mail') tab('mail'); } selectFolder(b.dataset.fold); };
+  $('#mFolderSel').innerHTML=`<option value="${NEWV}" ${MB.folder===NEWV?'selected':''}>${L2('Nouveaux','New')}${nNew?` (${nNew})`:''}</option>`+MB.folders.filter(f=>f.selectable).map(f=>`<option value="${esc(f.name)}" ${f.name===MB.folder?'selected':''}>${'— '.repeat(f.depth)}${esc(fLabel(f))}${f.unseen?` (${f.unseen})`:''}</option>`).join('');
+  $$('[data-fold]').forEach(b=>{ b.onclick=e=>{ if(e.target.closest('[data-tw]')) return; if(b.dataset.nosel){ const t=b.querySelector('[data-tw]'); t&&t.click(); return; } if(b.closest('#drawer')){ closeDrawer(); if(document.body.dataset.tab!=='mail') tab('mail'); } leaveNewCtx(); selectFolder(b.dataset.fold); };
     b.ondragover=e=>{ e.preventDefault(); b.classList.add('drop'); }; b.ondragleave=()=>b.classList.remove('drop');
-    b.ondrop=e=>{ e.preventDefault(); b.classList.remove('drop'); const uids=JSON.parse(e.dataTransfer.getData('text/uids')||'[]'); if(uids.length&&b.dataset.fold!==MB.folder&&!b.dataset.nosel) mMove(uids,b.dataset.fold); }; });
+    b.ondrop=e=>{ e.preventDefault(); b.classList.remove('drop'); const uids=JSON.parse(e.dataTransfer.getData('text/uids')||'[]'); if(uids.length&&b.dataset.fold!==MB.folder&&b.dataset.fold!==NEWV&&MB.folder!==NEWV&&!b.dataset.nosel) mMove(uids,b.dataset.fold); }; });
   $$('[data-tw]').forEach(t=>t.onclick=e=>{ e.stopPropagation(); const n=t.dataset.tw; CLOSED.has(n)?CLOSED.delete(n):CLOSED.add(n); saveClosed(); renderFolders(); });
+  $$('[data-fsec]').forEach(b=>b.onclick=()=>{ CLOSED.has(SEC_KEY)?CLOSED.delete(SEC_KEY):CLOSED.add(SEC_KEY); saveClosed(); renderFolders(); });
   wireNotifPrefs();
 }
 function afterFolders(){ updateUnreadIndicators(); }
-$('#mFolderSel').onchange=e=>selectFolder(e.target.value);
+$('#mFolderSel').onchange=e=>{ leaveNewCtx(); selectFolder(e.target.value); };
 function selectFolder(n){ MB.folder=n; MB.sel.clear(); MB.cur=null; MB.q=''; $('#mSearch').value=''; loadFolders(); loadList(true); showEmptyReader(); }
 async function loadList(reset){
+  document.body.classList.toggle('newview',MB.folder===NEWV); $('#mBackNew').classList.toggle('on',!!MB.backNew&&MB.folder!==NEWV);
+  if(MB.folder===NEWV) return loadNew(reset);
   if(MB.loading) return; MB.loading=true;
   if(reset){ MB.page=0; MB.items=[]; $('#mRows').innerHTML=Array(8).fill('<div style="padding:12px 14px;display:grid;grid-template-columns:34px 1fr;gap:10px"><div class="sk" style="height:34px"></div><div><div class="sk" style="height:12px;width:60%"></div><div class="sk" style="height:10px;width:85%;margin-top:8px"></div></div></div>').join(''); }
   const f=folderByName(MB.folder); $('#mTitle').textContent=f?fLabel(f):MB.folder;
@@ -2094,11 +2181,12 @@ $('#dAccount').onclick=()=>{ closeDrawer(); window.FMAndroid&&FMAndroid.changeAc
   addEventListener('touchend',e=>{ if(x0===null) return; const t=e.changedTouches[0], dx=t.clientX-x0, dy=Math.abs(t.clientY-y0);
     if(edge&&dx>60&&dy<50&&isPhone()) openDrawer(); else if(document.body.classList.contains('drawer-open')&&dx<-60&&dy<50) closeDrawer(); x0=null; },{passive:true}); })();
 /* ---- deep links (#m=<folder>&u=<uid>, #compose), Android back button */
-function parseHash(){ const h=new URLSearchParams(location.hash.slice(1)); return {m:h.get('m'),u:h.get('u'),compose:h.has('compose'),to:h.get('to'),update:h.has('update'),go:h.get('go')==='1'}; }
-async function handleDeepLink(){ if($('#app').classList.contains('hidden')) return; const d=parseHash(); if(!d.m&&!d.compose&&!d.update) return;
+function parseHash(){ const h=new URLSearchParams(location.hash.slice(1)); return {m:h.get('m'),u:h.get('u'),compose:h.has('compose'),to:h.get('to'),update:h.has('update'),go:h.get('go')==='1',nw:h.has('new')}; }
+async function handleDeepLink(){ if($('#app').classList.contains('hidden')) return; const d=parseHash(); if(!d.m&&!d.compose&&!d.update&&!d.nw) return;
   history.replaceState(null,'',location.pathname);
   if(d.update){ UPD_SHOWN=true; runUpdateCheck({install:d.go}); return; }
   if(d.compose){ tab('mail'); await compose('new'); if(d.to) setRcpt('to',[d.to]); return; }
+  if(d.nw){ if(document.body.classList.contains('drawer-open')) closeDrawer(); tab('mail'); leaveNewCtx(); selectFolder(NEWV); return; }
   if(document.body.classList.contains('drawer-open')) closeDrawer();
   if($('#compose').classList.contains('on')) $('#compose').classList.add('min');
   tab('mail');
@@ -2106,7 +2194,7 @@ async function handleDeepLink(){ if($('#app').classList.contains('hidden')) retu
   // already in flight (e.g. the inbox at startup), then load the notified folder and open that exact mail.
   for(let i=0;i<150&&MB.loading;i++) await new Promise(r=>setTimeout(r,80));
   const switching=MB.folder!==d.m||!MB.items.length;
-  MB.folder=d.m; MB.sel.clear(); MB.q=''; MB.filter=''; $('#mSearch').value=''; $$('[data-mf]').forEach(x=>x.classList.toggle('on',!x.dataset.mf));
+  MB.backNew=false; MB.folder=d.m; MB.sel.clear(); MB.q=''; MB.filter=''; $('#mSearch').value=''; $$('[data-mf]').forEach(x=>x.classList.toggle('on',!x.dataset.mf));
   if(switching){ MB.cur=null; await loadFolders(); await loadList(true); }
   if(d.u){ MB.items.some(x=>x.uid===d.u)&&MB.folder===d.m?openRow(d.u):openMsg(d.u); } }
 addEventListener('hashchange',handleDeepLink);
@@ -2195,6 +2283,7 @@ async function chime(manual){ if(!NP.sound&&!manual) return;
   return how; }
 function totalUnread(){ return MB.folders.filter(f=>!MUTE_ROLES.includes(f.role)&&f.name!==SNOOZE_FOLDER).reduce((a,f)=>a+(f.unseen||0),0); }
 function updateUnreadIndicators(){ const n=totalUnread();
+  $$('.fitem.newf').forEach(b=>{ let p=b.querySelector('.pill'); if(!n){ p?.remove(); return; } if(!p){ p=document.createElement('span'); p.className='pill'; b.appendChild(p); } p.textContent=num(n); });
   const nb=$('[data-tab=mail] .badge'); if(nb) nb.textContent=n?num(n):'';
   document.title=(n?`(${n}) `:'')+'Free Mail Manager'; const fv=$('#favicon'); if(fv) fv.href=favSvg(n); }
 let PREV=null, POLLING=false;
@@ -2213,7 +2302,8 @@ async function pollOnce(){
     chime(); toast(`${total} nouveau${total>1?'x':''} message${total>1?'s':''} dans ${where}`);
     if(NP.desktop&&!SESSION.notifier&&window.Notification&&Notification.permission==='granted'&&(document.hidden||!document.hasFocus()))
       sysNotify(`${total} nouveau${total>1?'x':''} message${total>1?'s':''}`,'Dans '+where,'/#m='+encodeURIComponent(fresh[0].name));
-    if(fresh.some(x=>x.name===MB.folder)&&!MB.q&&MB.page===0&&!MB.sel.size&&!$('#mail').classList.contains('hidden')) loadList(true); }
+    if(fresh.some(x=>x.name===MB.folder)&&!MB.q&&MB.page===0&&!MB.sel.size&&!$('#mail').classList.contains('hidden')) loadList(true);
+    if(MB.folder===NEWV&&!$('#mail').classList.contains('hidden')) loadNew(false); }
 }
 async function sysNotify(title,body,url){ const opt={body,icon:'/icons/icon-192.png',badge:'/icons/badge-96.png',tag:'fm-new',renotify:true,data:{url}};
   try{ const reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration(); if(reg){ await reg.showNotification(title,opt); return; } }catch(e){}

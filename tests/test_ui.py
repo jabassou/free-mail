@@ -123,3 +123,27 @@ def test_phone_no_horizontal_overflow(browser, server):
     page.click("#drawer #dUpd")
     page.wait_for_selector(".upd-scrim", timeout=8000)
     assert errors == []
+
+
+def test_new_view_and_collapsible_folders(browser, server, imap):
+    subject = imap.put(folder="Jobs/Alerts", subject="ui new view")
+    page, errors = _page(browser, server, viewport={"width": 1400, "height": 900}, locale="en-US")
+    page.evaluate("localStorage.setItem('fm-newp','all')")
+    page.click("#mFolders [data-fold='__new__']")
+    page.wait_for_selector(".ngrp")
+    assert page.inner_text("#mTitle") == "New"
+    assert page.locator(".ngh[data-ngt='Jobs/Alerts']").count() == 1
+    # the "Folders" section folds away (and remembers it), its unread count moves to the header
+    page.click("#mFolders [data-fsec]")
+    assert page.locator("#mFolders [data-fold='Jobs']").count() == 0
+    assert page.evaluate("JSON.parse(localStorage.getItem('fm-closed')).includes(':sec:folders')")
+    page.click("#mFolders [data-fsec]")
+    assert page.locator("#mFolders [data-fold='Jobs']").count() == 1
+    # a mail opens in its folder (unread filter) with a way back to "New"
+    page.locator(f".ngrp .mrow:has-text('{subject}')").first.click()
+    page.wait_for_selector("#mBackNew.on")
+    assert page.evaluate("MB.folder") == "Jobs/Alerts" and page.evaluate("MB.filter") == "unseen"
+    page.click("#mBackNew")
+    page.wait_for_selector(".ngrp")
+    assert page.evaluate("MB.folder") == "__new__" and page.evaluate("MB.filter") == ""
+    assert errors == []
