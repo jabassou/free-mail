@@ -73,11 +73,11 @@ jobs:
           gh api -X POST "repos/$R/git/refs" -f ref="refs/heads/release/$V" -f sha="$dev_sha" >/dev/null
           blob=$(gh api "repos/$R/contents/VERSION?ref=release/$V" --jq .sha)
           gh api -X PUT "repos/$R/contents/VERSION" \
-            -f message="Bump version to $V" \
+            -f message="chore: bump version to $V" \
             -f content="$(printf '%s\n' "$V" | base64 -w0)" \
             -f sha="$blob" -f branch="release/$V" >/dev/null
           url=$(gh pr create -R "$R" --base dev --head "release/$V" \
-            --title "Bump version to $V" --body "Version bump for the v$V release.")
+            --title "chore: bump version to $V" --body "Version bump for the v$V release.")
           pr=${url##*/}
           gh pr merge "$pr" -R "$R" --squash --auto
           for _ in $(seq 1 120); do
