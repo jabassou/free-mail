@@ -140,9 +140,9 @@ release-pr: ## 1/3 Bump VERSION on a release branch, PR into dev, merge when gre
 	git fetch -q origin
 	git switch -c release/$(V) origin/dev
 	echo "$(V)" > $(VERSION_FILE)
-	git commit -qam "Release $(V)"
+	git commit -qam "chore: release $(V)"
 	git push -u origin release/$(V)
-	gh pr create --base dev --title "Release $(V)" --body "Release $(V)."
+	gh pr create --base dev --title "chore: release $(V)" --body "Release $(V)."
 	sleep 20; gh pr checks release/$(V) --watch
 	gh pr merge release/$(V) --squash --delete-branch
 	git switch dev && git pull -q
@@ -167,8 +167,8 @@ tag: ## 3/3 Tag main (only if VERSION matches V) -> the CI builds and publishes 
 	gh release view v$(V) --json assets --jq '[.assets[].name]'
 	git switch dev
 
-.PHONY: release
-release: ## Manual full release: release-pr + promote + tag (V=X.Y.Z)
+.PHONY: release-manual
+release-manual: ## Manual full release without the Action: release-pr + promote + tag (V=X.Y.Z)
 	$(MAKE) release-pr V=$(V)
 	$(MAKE) promote
 	$(MAKE) tag V=$(V)
@@ -176,6 +176,20 @@ release: ## Manual full release: release-pr + promote + tag (V=X.Y.Z)
 # ------------------------------------------------------------------ automated release (GitHub Action "release")
 # Runs .github/workflows/release.yml from main: computes the next version, bumps dev,
 # promotes dev -> main, tags, waits for the APK. You only approve the "release" deployment.
+.PHONY: release
+release: ## Automated release; bump guessed from commit titles (feat -> minor, ! -> major, else patch); BUMP=minor to force
+	@git remote get-url origin | grep -q "$(REPO)" || { echo "wrong repository"; exit 1; }
+	@git fetch -q origin
+	@SUBJ=$$(git log --format=%s origin/main..origin/dev); \
+	  [ -n "$$SUBJ" ] || { echo "dev has nothing new compared to main"; exit 1; }; \
+	  echo "Commits to release:"; echo "$$SUBJ" | sed 's/^/  - /'; \
+	  if [ -n "$(BUMP)" ]; then B="$(BUMP)"; \
+	  elif echo "$$SUBJ" | grep -Eq '^[a-z]+(\([^)]*\))?!:|BREAKING'; then B=major; \
+	  elif echo "$$SUBJ" | grep -Eq '^feat(\([^)]*\))?:'; then B=minor; \
+	  else B=patch; fi; \
+	  echo "Suggested bump: $$B"; \
+	  $(MAKE) --no-print-directory _release-run BUMP=$$B
+
 .PHONY: _release-run
 _release-run:
 	@gh repo view "$(REPO)" >/dev/null || { echo "cannot reach $(REPO)"; exit 1; }
