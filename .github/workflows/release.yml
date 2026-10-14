@@ -1,0 +1,101 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version X.Y.Z (must equal VERSION on dev)"
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      github.repository == 'jabassou/free-mail' &&
+      github.actor == 'jabassou' &&
+      github.triggering_actor == 'jabassou' &&
+      github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 60
+    permissions: {}
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      V: ${{ inputs.version }}
+      R: ${{ github.repository }}
+      DISPATCH_SHA: ${{ github.sha }}
+    steps:
+      - name: Guardrails
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+
+          [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "version must be X.Y.Z"
+
+          getv() { gh api "repos/$R/contents/VERSION?ref=$1" --jq .content | base64 -d | tr -d '[:space:]'; }
+          dev_v=$(getv "$DISPATCH_SHA")
+          main_v=$(getv main)
+          [ "$dev_v" = "$V" ] || fail "VERSION on dev is $dev_v, not $V"
+          [ "$(printf '%s\n%s\n' "$main_v" "$V" | sort -V | tail -1)" = "$V" ] && [ "$main_v" != "$V" ] \
+            || fail "$V is not greater than main ($main_v)"
+
+          if gh api "repos/$R/git/ref/tags/v$V" >/dev/null 2>&1; then fail "tag v$V already exists"; fi
+
+          dev_sha=$(gh api "repos/$R/commits/dev" --jq .sha)
+          [ "$dev_sha" = "$DISPATCH_SHA" ] || fail "dev moved since dispatch ($dev_sha != $DISPATCH_SHA)"
+          echo "Guardrails OK: $main_v -> $V at $dev_sha"
+
+      - name: Open or reuse the dev -> main PR
+        id: pr
+        run: |
+          set -euo pipefail
+          pr=$(gh pr list -R "$R" --base main --head dev --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            url=$(gh pr create -R "$R" --base main --head dev \
+              --title "Release v$V" --body "Promote dev to main for v$V.")
+            pr=${url##*/}
+          fi
+          echo "number=$pr" >> "$GITHUB_OUTPUT"
+          echo "PR #$pr"
+
+      - name: Merge when required checks pass (merge commit)
+        env:
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR" -R "$R" --merge --auto --match-head-commit "$DISPATCH_SHA"
+          for _ in $(seq 1 120); do
+            s=$(gh pr view "$PR" -R "$R" --json state --jq .state)
+            case "$s" in
+              MERGED) break ;;
+              CLOSED) echo "::error::PR #$PR closed without merge"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          [ "$s" = "MERGED" ] || { echo "::error::PR #$PR not merged after 30 min"; exit 1; }
+          echo "MERGE_SHA=$(gh pr view "$PR" -R "$R" --json mergeCommit --jq .mergeCommit.oid)" >> "$GITHUB_ENV"
+
+      - name: Tag the merge commit
+        run: |
+          set -euo pipefail
+          got=$(gh api "repos/$R/contents/VERSION?ref=$MERGE_SHA" --jq .content | base64 -d | tr -d '[:space:]')
+          [ "$got" = "$V" ] || { echo "::error::VERSION at $MERGE_SHA is $got, not $V"; exit 1; }
+          gh api -X POST "repos/$R/git/refs" -f ref="refs/tags/v$V" -f sha="$MERGE_SHA" >/dev/null
+          echo "Tagged v$V on $MERGE_SHA"
+
+      - name: Wait for the signed APK in the release
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 80); do
+            if gh release view "v$V" -R "$R" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "FreeMail-v$V.apk"; then
+              echo "Release v$V published with FreeMail-v$V.apk"; exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::FreeMail-v$V.apk not found in release v$V (check the apk workflow)"; exit 1
