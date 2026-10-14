@@ -131,7 +131,7 @@ signing-backup: ## Encrypted backup of the signing key (~/Documents)
 termux-bundle: ## Build free-mail-termux.zip (legacy Termux mode)
 	./termux/bundle.sh
 
-# ------------------------------------------------------------------ release (V=X.Y.Z)
+# ------------------------------------------------------------------ manual release (V=X.Y.Z, without the GitHub Action)
 .PHONY: release-pr
 release-pr: ## 1/3 Bump VERSION on a release branch, PR into dev, merge when green
 	@[ -n "$(V)" ] || { echo "usage: make release-pr V=X.Y.Z"; exit 1; }
@@ -140,9 +140,9 @@ release-pr: ## 1/3 Bump VERSION on a release branch, PR into dev, merge when gre
 	git fetch -q origin
 	git switch -c release/$(V) origin/dev
 	echo "$(V)" > $(VERSION_FILE)
-	git commit -qam "Release $(V)"
+	git commit -qam "chore: release $(V)"
 	git push -u origin release/$(V)
-	gh pr create --base dev --title "Release $(V)" --body "Release $(V)."
+	gh pr create --base dev --title "chore: release $(V)" --body "Release $(V)."
 	sleep 20; gh pr checks release/$(V) --watch
 	gh pr merge release/$(V) --squash --delete-branch
 	git switch dev && git pull -q
@@ -167,11 +167,51 @@ tag: ## 3/3 Tag main (only if VERSION matches V) -> the CI builds and publishes 
 	gh release view v$(V) --json assets --jq '[.assets[].name]'
 	git switch dev
 
-.PHONY: release
-release: ## Full release: release-pr + promote + tag (V=X.Y.Z)
+.PHONY: release-manual
+release-manual: ## Manual full release without the Action: release-pr + promote + tag (V=X.Y.Z)
 	$(MAKE) release-pr V=$(V)
 	$(MAKE) promote
 	$(MAKE) tag V=$(V)
+
+# ------------------------------------------------------------------ automated release (GitHub Action "release")
+# Runs .github/workflows/release.yml from main: computes the next version, bumps dev,
+# promotes dev -> main, tags, waits for the APK. You only approve the "release" deployment.
+.PHONY: release
+release: ## Automated release; bump guessed from commit titles (feat -> minor, ! -> major, else patch); BUMP=minor to force
+	@git remote get-url origin | grep -q "$(REPO)" || { echo "wrong repository"; exit 1; }
+	@git fetch -q origin
+	@SUBJ=$$(git log --format=%s origin/main..origin/dev); \
+	  [ -n "$$SUBJ" ] || { echo "dev has nothing new compared to main"; exit 1; }; \
+	  echo "Commits to release:"; echo "$$SUBJ" | sed 's/^/  - /'; \
+	  if [ -n "$(BUMP)" ]; then B="$(BUMP)"; \
+	  elif echo "$$SUBJ" | grep -Eq '^[a-z]+(\([^)]*\))?!:|BREAKING'; then B=major; \
+	  elif echo "$$SUBJ" | grep -Eq '^feat(\([^)]*\))?:'; then B=minor; \
+	  else B=patch; fi; \
+	  echo "Suggested bump: $$B"; \
+	  $(MAKE) --no-print-directory _release-run BUMP=$$B
+
+.PHONY: _release-run
+_release-run:
+	@gh repo view "$(REPO)" >/dev/null || { echo "cannot reach $(REPO)"; exit 1; }
+	@git remote get-url origin | grep -q "$(REPO)" || { echo "wrong repository"; exit 1; }
+	@echo "Next: $$(git show origin/main:VERSION 2>/dev/null | tr -d '[:space:]') -> bump $(BUMP)"
+	@read -rp "Start the $(BUMP) release? [y/N] " a; [ "$$a" = y ] || { echo aborted; exit 1; }
+	gh workflow run release.yml -R $(REPO) --ref main -f bump=$(BUMP)
+	@sleep 8; ID=$$(gh run list -R $(REPO) --workflow release.yml --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId'); \
+	  echo "Run $$ID: approve the 'release' deployment in the GitHub UI (or the notification)"; \
+	  gh run watch -R $(REPO) "$$ID" --exit-status
+
+.PHONY: release-patch
+release-patch: ## Automated release, patch bump (1.6.0 -> 1.6.1)
+	@$(MAKE) --no-print-directory _release-run BUMP=patch
+
+.PHONY: release-minor
+release-minor: ## Automated release, minor bump (1.6.0 -> 1.7.0)
+	@$(MAKE) --no-print-directory _release-run BUMP=minor
+
+.PHONY: release-major
+release-major: ## Automated release, major bump (1.6.0 -> 2.0.0)
+	@$(MAKE) --no-print-directory _release-run BUMP=major
 
 # ------------------------------------------------------------------ misc
 .PHONY: status

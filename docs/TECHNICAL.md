@@ -230,3 +230,9 @@ The `apk` workflow writes `VERSION` from the tag, builds, signs and publishes th
 ### README screenshots
 
 The images in `docs/images/` come from a fictional mailbox (`alex.martin@free.fr`, `example.*` senders) on a local Dovecot server, captured with Playwright at phone (393×852) and desktop (1440×900) sizes.
+
+## Pull request titles
+
+PRs into `dev` must be titled `type: description` (optional scope, `!` for a breaking change), in English:
+`feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`. The `pr-title` check enforces it, and the squash merge keeps the title as the commit subject.
+`make release` reads those subjects to pick the version bump: `feat` gives a minor, `!` or `BREAKING` a major, anything else a patch. Dependabot PRs are titled `chore(deps): …` / `ci(deps): …` (see `.github/dependabot.yml`).

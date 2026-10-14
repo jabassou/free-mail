@@ -1,0 +1,141 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Bump level if VERSION on dev is not already ahead of main"
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      github.repository == 'jabassou/free-mail' &&
+      github.actor == 'jabassou' &&
+      github.triggering_actor == 'jabassou' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: release
+    timeout-minutes: 90
+    permissions: {}
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      R: ${{ github.repository }}
+      BUMP: ${{ inputs.bump }}
+    steps:
+      - name: Compute the version and check guardrails
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          getv() { gh api "repos/$R/contents/VERSION?ref=$1" --jq .content | base64 -d | tr -d '[:space:]'; }
+          ok() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; }
+
+          main_v=$(getv main); dev_v=$(getv dev)
+          ok "$main_v" || fail "bad VERSION on main: $main_v"
+          ok "$dev_v"  || fail "bad VERSION on dev: $dev_v"
+
+          ahead=$(gh api "repos/$R/compare/main...dev" --jq .ahead_by)
+          [ "$ahead" -gt 0 ] || fail "dev has no commit ahead of main: nothing to release"
+
+          newest=$(printf '%s\n%s\n' "$main_v" "$dev_v" | sort -V | tail -1)
+          if [ "$dev_v" != "$main_v" ] && [ "$newest" = "$dev_v" ]; then
+            V=$dev_v; NEED_BUMP=false
+          elif [ "$dev_v" = "$main_v" ]; then
+            IFS=. read -r a b c <<<"$main_v"
+            case "$BUMP" in
+              patch) c=$((c+1)) ;;
+              minor) b=$((b+1)); c=0 ;;
+              major) a=$((a+1)); b=0; c=0 ;;
+              *) fail "unknown bump $BUMP" ;;
+            esac
+            V="$a.$b.$c"; NEED_BUMP=true
+          else
+            fail "VERSION on dev ($dev_v) is behind main ($main_v)"
+          fi
+
+          if gh api "repos/$R/git/ref/tags/v$V" >/dev/null 2>&1; then fail "tag v$V already exists"; fi
+          echo "Release plan: $main_v -> $V (bump needed: $NEED_BUMP, $ahead commit(s) ahead)"
+          { echo "V=$V"; echo "NEED_BUMP=$NEED_BUMP"; } >> "$GITHUB_ENV"
+
+      - name: Bump VERSION on dev through a PR
+        if: env.NEED_BUMP == 'true'
+        run: |
+          set -euo pipefail
+          dev_sha=$(gh api "repos/$R/commits/dev" --jq .sha)
+          gh api -X POST "repos/$R/git/refs" -f ref="refs/heads/release/$V" -f sha="$dev_sha" >/dev/null
+          blob=$(gh api "repos/$R/contents/VERSION?ref=release/$V" --jq .sha)
+          gh api -X PUT "repos/$R/contents/VERSION" \
+            -f message="Bump version to $V" \
+            -f content="$(printf '%s\n' "$V" | base64 -w0)" \
+            -f sha="$blob" -f branch="release/$V" >/dev/null
+          url=$(gh pr create -R "$R" --base dev --head "release/$V" \
+            --title "Bump version to $V" --body "Version bump for the v$V release.")
+          pr=${url##*/}
+          gh pr merge "$pr" -R "$R" --squash --auto
+          for _ in $(seq 1 120); do
+            s=$(gh pr view "$pr" -R "$R" --json state --jq .state)
+            [ "$s" = "MERGED" ] && break
+            [ "$s" = "CLOSED" ] && { echo "::error::bump PR #$pr closed"; exit 1; }
+            sleep 15
+          done
+          [ "$s" = "MERGED" ] || { echo "::error::bump PR #$pr not merged after 30 min"; exit 1; }
+          got=$(gh api "repos/$R/contents/VERSION?ref=dev" --jq .content | base64 -d | tr -d '[:space:]')
+          [ "$got" = "$V" ] || { echo "::error::VERSION on dev is $got, expected $V"; exit 1; }
+          gh api -X DELETE "repos/$R/git/refs/heads/release/$V" >/dev/null 2>&1 || true
+
+      - name: Open or reuse the dev -> main PR
+        id: pr
+        run: |
+          set -euo pipefail
+          dev_sha=$(gh api "repos/$R/commits/dev" --jq .sha)
+          echo "DEV_SHA=$dev_sha" >> "$GITHUB_ENV"
+          pr=$(gh pr list -R "$R" --base main --head dev --state open --json number --jq '.[0].number // empty')
+          if [ -z "$pr" ]; then
+            url=$(gh pr create -R "$R" --base main --head dev \
+              --title "Release v$V" --body "Promote dev to main for v$V.")
+            pr=${url##*/}
+          fi
+          echo "number=$pr" >> "$GITHUB_OUTPUT"
+          echo "PR #$pr at $dev_sha"
+
+      - name: Merge when required checks pass (merge commit)
+        env:
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR" -R "$R" --merge --auto --match-head-commit "$DEV_SHA"
+          for _ in $(seq 1 120); do
+            s=$(gh pr view "$PR" -R "$R" --json state --jq .state)
+            [ "$s" = "MERGED" ] && break
+            [ "$s" = "CLOSED" ] && { echo "::error::PR #$PR closed without merge"; exit 1; }
+            sleep 15
+          done
+          [ "$s" = "MERGED" ] || { echo "::error::PR #$PR not merged after 30 min"; exit 1; }
+          echo "MERGE_SHA=$(gh pr view "$PR" -R "$R" --json mergeCommit --jq .mergeCommit.oid)" >> "$GITHUB_ENV"
+
+      - name: Tag the merge commit
+        run: |
+          set -euo pipefail
+          got=$(gh api "repos/$R/contents/VERSION?ref=$MERGE_SHA" --jq .content | base64 -d | tr -d '[:space:]')
+          [ "$got" = "$V" ] || { echo "::error::VERSION at $MERGE_SHA is $got, not $V"; exit 1; }
+          gh api -X POST "repos/$R/git/refs" -f ref="refs/tags/v$V" -f sha="$MERGE_SHA" >/dev/null
+          echo "Tagged v$V on $MERGE_SHA"
+
+      - name: Wait for the signed APK in the release
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 80); do
+            if gh release view "v$V" -R "$R" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "FreeMail-v$V.apk"; then
+              echo "Release v$V published with FreeMail-v$V.apk"; exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::FreeMail-v$V.apk not found in release v$V (check the apk workflow)"; exit 1
