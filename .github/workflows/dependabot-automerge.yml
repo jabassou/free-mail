@@ -1,0 +1,39 @@
+name: dependabot-automerge
+
+on: pull_request
+
+permissions: {}
+
+jobs:
+  automerge:
+    # PR author, not github.actor: a manual re-run must not change the outcome
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'jabassou/free-mail'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2.5.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # pip: patch + minor (covered by the test suite); gradle and actions: patch only
+      - name: Enable auto-merge for low-risk updates
+        if: >-
+          (steps.meta.outputs.package-ecosystem == 'pip' && steps.meta.outputs.update-type != 'version-update:semver-major') ||
+          steps.meta.outputs.update-type == 'version-update:semver-patch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$PR_URL"
+
+      - name: Label for manual review
+        if: >-
+          !((steps.meta.outputs.package-ecosystem == 'pip' && steps.meta.outputs.update-type != 'version-update:semver-major') ||
+          steps.meta.outputs.update-type == 'version-update:semver-patch')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr edit "$PR_URL" --add-label needs-review
