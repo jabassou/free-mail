@@ -1,0 +1,25 @@
+name: pr-title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+  title:
+    runs-on: ubuntu-latest
+    permissions: {}
+    env:
+      TITLE: ${{ github.event.pull_request.title }}
+      BASE: ${{ github.base_ref }}
+    steps:
+      - name: Check the PR title
+        run: |
+          # dev -> main promotions are titled "Release vX.Y.Z"
+          if [ "$BASE" != "dev" ]; then echo "base is $BASE: not checked"; exit 0; fi
+          re='^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\([a-z0-9._-]+\))?!?: .+'
+          if [[ "$TITLE" =~ $re ]]; then echo "OK: $TITLE"; else
+            echo "::error::Title must look like 'feat: ...', 'fix: ...' or 'chore: ...' (scope and ! allowed). Got: $TITLE"
+            exit 1
+          fi

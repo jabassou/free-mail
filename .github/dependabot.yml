@@ -5,12 +5,14 @@ updates:
     directory: /
     target-branch: dev
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "ci(deps)" }
     groups:
       actions: { patterns: ["*"] }
   - package-ecosystem: pip
     directories: ["/", "/tests"]
     target-branch: dev
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "chore(deps)" }
     groups:
       python: { patterns: ["*"] }
   - package-ecosystem: gradle
@@ -23,5 +25,6 @@ updates:
       - dependency-name: "androidx.core:core-ktx"
         versions: [">=1.17.0"]
     schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "chore(deps)" }
     groups:
       android: { patterns: ["*"] }
