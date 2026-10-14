@@ -5,6 +5,7 @@ backups/
 __pycache__/
 .pytest_cache/
 .login-method
+.login-browser-mode
 free-mail-termux.zip
 *.apk
 junit.xml

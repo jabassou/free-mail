@@ -858,50 +858,88 @@ def _http_login(base: str, user: str, pw: str, log) -> str:
     return _cookie_header(((c.name, c.value, c.domain) for c in s.cookies), host)
 
 
+BROWSER_MODE_FILE = ROOT / ".login-browser-mode"  # last browser mode that worked (no secret inside)
+
+
 def _browser_login(base: str, user: str, pw: str, log, headless: bool = True) -> str:
-    """Drive a real browser (installed Chrome, or Playwright's Chromium) through the login page."""
+    """Drive a real browser (installed Chrome, or Playwright's Chromium) through the login page.
+
+    Free's login page refuses headless Chrome (the form stays on screen), so when the headless attempt
+    fails the login is retried in a normal window placed off screen. The mode that worked is remembered."""
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
         raise LoginError("navigateur automatisé indisponible : pip install playwright") from None
     from urllib.parse import urlparse
     host = urlparse(base).hostname
+    if not headless:
+        modes = ["visible"]
+    else:
+        modes = ["headless", "offscreen"]
+        try:
+            if BROWSER_MODE_FILE.read_text().strip() == "offscreen":
+                modes = ["offscreen", "headless"]
+        except OSError:
+            pass
+    last = None
     with sync_playwright() as p:
-        try:
-            b = p.chromium.launch(channel="chrome", headless=headless)
-            log("Navigateur : Google Chrome")
-        except Exception:  # noqa: BLE001
+        for mode in modes:
+            args = ["--disable-blink-features=AutomationControlled"]
+            if mode == "offscreen":
+                args += ["--window-position=-32000,-32000", "--window-size=800,600"]
             try:
-                b = p.chromium.launch(headless=headless)
-                log("Navigateur : Chromium (Playwright)")
-            except Exception as e:  # noqa: BLE001
-                raise LoginError(f"aucun navigateur utilisable ({e}). Installe Chrome ou lance : playwright install chromium") from None
-        try:
-            ctx = b.new_context(locale="fr-FR", user_agent=UA)
-            pg = ctx.new_page()
-            pg.goto(base, wait_until="domcontentloaded", timeout=30000)
-            pwd = pg.locator("input[type=password]").first
-            pwd.wait_for(state="visible", timeout=20000)
-            usr = pg.locator("input:not([type=hidden]):not([type=password]):not([type=submit]):not([type=button])"
-                             ":not([type=checkbox]):not([type=radio])").first
-            usr.fill(user)
-            pwd.fill(pw)
-            log("Navigateur : formulaire rempli, validation…")
-            pwd.press("Enter")
-            start_url = pg.url
-            for i in range(60):
-                if any(c["name"] == "ZM_AUTH_TOKEN" for c in ctx.cookies()):
-                    break
-                pg.wait_for_timeout(500)
-                # still on the same page with the password field after 8 s: credentials refused
-                if i >= 16 and pg.url == start_url and pg.locator("input[type=password]").first.is_visible():
-                    raise LoginError("identifiants refusés (le formulaire de connexion est toujours affiché)")
-            else:
-                raise LoginError("pas de session après 30 s (captcha ou double authentification ?)")
-            pg.wait_for_timeout(1000)
-            return _cookie_header(((c["name"], c["value"], c["domain"]) for c in ctx.cookies()), host)
-        finally:
-            b.close()
+                b = p.chromium.launch(channel="chrome", headless=mode == "headless", args=args)
+                log(f"Navigateur : Google Chrome ({mode})")
+            except Exception:  # noqa: BLE001
+                try:
+                    b = p.chromium.launch(headless=mode == "headless", args=args)
+                    log(f"Navigateur : Chromium Playwright ({mode})")
+                except Exception as e:  # noqa: BLE001
+                    raise LoginError(f"aucun navigateur utilisable ({e}). Installe Chrome ou lance : playwright install chromium") from None
+            try:
+                # real Chrome version in the UA, without the "HeadlessChrome" marker
+                ua = UA.replace("Chrome/129.0", f"Chrome/{b.version}")
+                ctx = b.new_context(locale="fr-FR", user_agent=ua)
+                ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                cookie = _browser_fill(ctx, base, host, user, pw, log)
+                if headless:
+                    try:
+                        BROWSER_MODE_FILE.write_text(mode)
+                    except OSError:
+                        pass
+                return cookie
+            except LoginError as e:
+                last = e
+                if mode != modes[-1]:
+                    log(f"  {mode} : {e} -> nouvel essai")
+            finally:
+                b.close()
+    raise last
+
+
+def _browser_fill(ctx, base: str, host: str, user: str, pw: str, log) -> str:
+    pg = ctx.new_page()
+    pg.goto(base, wait_until="domcontentloaded", timeout=30000)
+    pwd = pg.locator("input[type=password]").first
+    pwd.wait_for(state="visible", timeout=20000)
+    usr = pg.locator("input:not([type=hidden]):not([type=password]):not([type=submit]):not([type=button])"
+                     ":not([type=checkbox]):not([type=radio])").first
+    usr.fill(user)
+    pwd.fill(pw)
+    log("Navigateur : formulaire rempli, validation…")
+    pwd.press("Enter")
+    start_url = pg.url
+    for i in range(60):
+        if any(c["name"] == "ZM_AUTH_TOKEN" for c in ctx.cookies()):
+            break
+        pg.wait_for_timeout(500)
+        # still on the same page with the password field after 8 s: credentials refused
+        if i >= 16 and pg.url == start_url and pg.locator("input[type=password]").first.is_visible():
+            raise LoginError("identifiants refusés (le formulaire de connexion est toujours affiché)")
+    else:
+        raise LoginError("pas de session après 30 s (captcha ou double authentification ?)")
+    pg.wait_for_timeout(1000)
+    return _cookie_header(((c["name"], c["value"], c["domain"]) for c in ctx.cookies()), host)
 
 
 def webmail_login(cfg: dict, password: str | None = None, log=print, method: str | None = None) -> tuple[str, int]:
