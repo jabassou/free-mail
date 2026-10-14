@@ -236,3 +236,7 @@ The images in `docs/images/` come from a fictional mailbox (`alex.martin@free.fr
 PRs into `dev` must be titled `type: description` (optional scope, `!` for a breaking change), in English:
 `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `build`, `ci`, `chore`, `revert`. The `pr-title` check enforces it, and the squash merge keeps the title as the commit subject.
 `make release` reads those subjects to pick the version bump: `feat` gives a minor, `!` or `BREAKING` a major, anything else a patch. Dependabot PRs are titled `chore(deps): …` / `ci(deps): …` (see `.github/dependabot.yml`).
+
+## Releasing
+
+Run `make release` from `dev`: it lists the commits since `main`, suggests the bump from their titles (see above) and starts the `release` workflow. Approve the `release` deployment on GitHub when asked. The workflow bumps `VERSION` on `dev`, merges `dev` into `main`, tags `vX.Y.Z` and waits for the signed APK. `make release-manual V=X.Y.Z` runs the same steps by hand.
