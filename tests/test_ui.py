@@ -1,4 +1,5 @@
 """Smoke tests of the web UI in headless Chromium (desktop + phone layouts)."""
+import os
 import re
 import shutil
 
@@ -6,7 +7,7 @@ import pytest
 
 pw = pytest.importorskip("playwright.sync_api")
 
-from conftest import TOKEN  # noqa: E402
+from conftest import TOKEN, wait_for  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -163,3 +164,16 @@ def test_maintenance_simulate_opens_plan_panel_not_mail_menu(browser, server, im
         assert not page.evaluate("document.body.classList.contains('drawer-open')")
         page.evaluate("closeDrawers()")
         assert errors == []
+
+
+def test_report_phishing_moves_to_spam(browser, server, imap):
+    imap.ensure("Junk")
+    subject = imap.put(subject=f"Payment received 4F9A8C7E21B0 ui phish {os.urandom(3).hex()}")
+    page, errors = _page(browser, server, viewport={"width": 1400, "height": 900}, locale="en-US")
+    assert page.evaluate("phishPattern('Re: Paiement effectué avec succès 4F9A8C7E21B0')") == "paiement effectué avec succès"
+    page.locator(f"#mRows .mrow:has-text('{subject}')").first.click()
+    page.wait_for_selector("#rPhish")
+    page.click("#rPhish")
+    wait_for(lambda: imap.find("Junk", subject))
+    assert not imap.find("INBOX", subject)
+    assert errors == []

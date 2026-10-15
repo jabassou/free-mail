@@ -918,6 +918,7 @@ body.newview #mList .search,body.newview #mFilters,body.newview #mThreads{displa
 
 <script>
 const I18N_EN={
+'Signaler comme phishing':'Report as phishing','Bloquer les prochains mails ?':'Block future mails?','Message déplacé dans le Spam':'Message moved to Spam','Aucun dossier Spam trouvé':'No Spam folder found','Ce message est déjà dans le Spam':'This message is already in Spam','Créer une règle serveur : les mails similaires iront directement dans le Spam.':'Create a server rule: similar mails will go straight to Spam.','Le sujet contient':'Subject contains',"Sauf si l'expéditeur contient (optionnel)":'Unless the sender contains (optional)','Non merci':'No thanks','Créer la règle':'Create rule','Règle créée':'Rule created','Motif trop court':'Pattern too short',
 'Diagnostic':'Diagnostics',"État de l'appli, à joindre à un signalement de bug.":'App status, to attach to a bug report.','État':'Status','Copier':'Copy','Partager':'Share',
 'Rechercher une mise à jour':'Check for updates','Vérifiées automatiquement ; une notification signale chaque nouvelle version.':'Checked automatically; a notification announces every new version.',
 'Installée':'Installed','Dernière':'Latest','Nouvelle version disponible':'New version available','Ignorer cette version':'Skip this version','Mettre à jour':'Update',
@@ -1041,6 +1042,7 @@ const I18N_EN={
 'Copier':'Copy','Copié':'Copied','Fichier':'File','Sur':'Of','et':'and','Dans':'In',
 };
 const I18N_EN_RX=[
+[/^(\d+) mail\(s\) de la boîte de réception correspondent$/,'$1 inbox mail(s) match'],
 [/^À jour \(v(.+)\)$/,'Up to date (v$1)'],[/^Version (.+) ignorée$/,'Version $1 skipped'],
 [/^([^()]+) \((\d+)\)$/,(m,a,b)=>{ const t=I18N_EN[a.trim()]; return t?`${t} (${b})`:m; }],
 [/^Connecté à la boîte \(IMAP\)$/,'Connected to the mailbox (IMAP)'],[/^(.+) \[(.+)\] : (\d+) mail\(s\) trouvé\(s\), lecture des en-têtes…$/,'$1 [$2]: $3 mail(s) found, reading headers…'],
@@ -1843,6 +1845,7 @@ async function openMsg(uid,remote=false){
       <button class="iconbtn" id="rSnooze" title="Répéter plus tard (H)">${I('snooze','sm')}</button>
       <button class="iconbtn" id="rStar" title="Suivre (S)" style="${m.flagged?'color:#f59e0b':''}">${I('star','sm')}</button>
       <button class="iconbtn" id="rUnread" title="Marquer non lu (U)">${I('mail','sm')}</button>
+      <button class="iconbtn" id="rPhish" title="Signaler comme phishing">${I('shield','sm')}</button>
       <button class="iconbtn del" id="rDel" title="Supprimer (#)">${I('trash','sm')}</button>
       <span class="sp"></span>${m.unsubscribe?`<button class="btn xs" id="rUnsub" title="Se désabonner de cet expéditeur">${I('unsub','sm')}<span class="tl">Désabonner</span></button>`:''}
       <button class="btn xs" id="rWizard" title="Créer un filtre pour cet expéditeur">${I('spark','sm')}<span class="tl">Filtrer</span></button></div>
@@ -1855,6 +1858,7 @@ async function openMsg(uid,remote=false){
     </div>`;
   fillFrame($('#rFrame'),m,remote);
   $('#rReply').onclick=()=>compose('reply'); $('#rReplyAll').onclick=()=>compose('replyall'); $('#rFwd').onclick=()=>compose('forward');
+  $('#rPhish').onclick=()=>mPhish([uid],m.subject);
   $('#rDel').onclick=()=>mDelete([uid]); $('#rUnread').onclick=()=>{ mFlag([uid],'seen',false); showEmptyReader(); MB.cur=null; };
   $('#rStar').onclick=()=>mFlag([uid],'flagged',!m.flagged).then(()=>{ m.flagged=!m.flagged; $('#rStar').style.color=m.flagged?'#f59e0b':''; });
   $('#rMove').onclick=e=>moveMenu(e.currentTarget,[uid]);
@@ -1904,6 +1908,7 @@ async function openThread(uid){
       <button class="iconbtn" id="rSnooze" title="Répéter plus tard (H)">${I('snooze','sm')}</button>
       <button class="iconbtn" id="rStar" title="Suivre (S)">${I('star','sm')}</button>
       <button class="iconbtn" id="rUnread" title="Marquer non lu (U)">${I('mail','sm')}</button>
+      <button class="iconbtn" id="rPhish" title="Signaler comme phishing">${I('shield','sm')}</button>
       <button class="iconbtn del" id="rDel" title="Supprimer la conversation (#)">${I('trash','sm')}</button>
       <span class="sp"></span><button class="btn xs" id="rExpand" title="Tout déplier">${I('down','sm')}<span class="tl">Tout déplier</span></button>
       <button class="btn xs" id="rWizard" title="Créer un filtre pour cet expéditeur">${I('spark','sm')}<span class="tl">Filtrer</span></button></div>
@@ -1913,6 +1918,7 @@ async function openThread(uid){
   t.items.forEach((x,i)=>{ if(i===t.items.length-1||!x.seen) toggleCard(i,true); });
   const withLast=async fn=>{ const i=t.items.length-1; if(!t.items[i]._m) await toggleCard(i,true); MB.msg=t.items[i]._m; fn(); };
   $('#rReply').onclick=()=>withLast(()=>compose('reply')); $('#rReplyAll').onclick=()=>withLast(()=>compose('replyall')); $('#rFwd').onclick=()=>withLast(()=>compose('forward'));
+  $('#rPhish').onclick=()=>mPhish(curUids(),t.subject);
   $('#rDel').onclick=()=>mDelete(curUids()); $('#rUnread').onclick=()=>{ mFlag(curUids(),'seen',false); showEmptyReader(); MB.cur=null; };
   const g=MB.gmap.get(uid); const fl=()=>g&&g.items.some(x=>x.flagged); $('#rStar').style.color=fl()?'#f59e0b':'';
   $('#rStar').onclick=()=>{ const on=!fl(); mFlag(curUids(),'flagged',on).then(()=>{ $('#rStar').style.color=on?'#f59e0b':''; }); };
@@ -1972,6 +1978,51 @@ async function mDelete(uids){
   if(inTrash&&!confirm(`Supprimer définitivement ${uids.length} message(s) ? Irréversible.`)) return;
   try{ await api('mail/delete',{folder:MB.folder,uids}); removeLocal(uids); toast(inTrash?`${uids.length} message(s) supprimé(s) définitivement`:`${uids.length} message(s) mis à la corbeille`); loadFolders(); }
   catch(e){ toast('Erreur : '+e.message,'err'); } }
+function phishPattern(subject){
+  const words=normSubj(subject||'').split(/\s+/).filter(Boolean).filter(w=>!(/^[0-9a-f]{8,}$/i.test(w)||/^#?\d{5,}$/.test(w)||(/\d/.test(w)&&/[a-z]/i.test(w)&&w.length>=6)));
+  return words.join(' ').replace(/[\s:;,.\-–—|]+$/,'').trim(); }
+async function mPhish(uids,subject){
+  const junk=MB.folders.find(f=>f.role==='junk');
+  if(!junk){ toast('Aucun dossier Spam trouvé','err'); return; }
+  if(MB.folder===junk.name){ toast('Ce message est déjà dans le Spam','err'); return; }
+  try{ await api('mail/move',{folder:MB.folder,uids,dest:junk.name}); removeLocal(uids); loadFolders(); }
+  catch(e){ toast('Erreur : '+e.message,'err'); return; }
+  toast('Message déplacé dans le Spam');
+  const pat=phishPattern(subject);
+  if(pat.length>=6&&SESSION&&SESSION.zimbra) phishRuleDialog(pat); }
+function phishRuleDialog(pat){
+  closeUpdateDialog();
+  const d=document.createElement('div'); d.className='upd-scrim'; d.setAttribute('role','dialog'); d.setAttribute('aria-modal','true');
+  d.innerHTML=`<div class="upd-box"><div class="hd"><div class="chip-ic">${I('shield')}</div><div><h3>Bloquer les prochains mails ?</h3>
+      <div class="sub">Créer une règle serveur : les mails similaires iront directement dans le Spam.</div></div></div>
+    <div style="padding:0 18px"><label class="small muted" for="phPat">Le sujet contient</label>
+      <input id="phPat" class="inp" style="width:100%;margin:4px 0 10px" value="${esc(pat)}" translate="no">
+      <label class="small muted" for="phNot">Sauf si l'expéditeur contient (optionnel)</label>
+      <input id="phNot" class="inp" style="width:100%;margin:4px 0 10px" placeholder="amazon" translate="no">
+      <div id="phInfo" class="small muted" style="min-height:20px"></div></div>
+    <div class="ft"><button class="btn" data-p="no">Non merci</button><button class="btn primary" data-p="go">${I('shield','sm')}Créer la règle</button></div></div>`;
+  document.body.appendChild(d);
+  const pv=$('#phPat'), nt=$('#phNot'), info=$('#phInfo'), go=d.querySelector('[data-p=go]'); let tm=0, seq=0;
+  const model=()=>{ const p=pv.value.trim(), n=nt.value.trim();
+    const conditions=[{field:'subject',op:'contains',value:p}]; if(n) conditions.push({field:'from',op:'contains',value:n,negative:true});
+    return {name:'Phishing – '+p.slice(0,50),active:true,any:false,stop:true,conditions,actions:[{type:'junk'}]}; };
+  const check=async()=>{ const my=++seq; const p=pv.value.trim(); go.disabled=p.length<4;
+    if(p.length<4){ info.textContent='Motif trop court'; return; }
+    try{ const r=await api('filters/check',{filter:model(),preview:true}); if(my!==seq) return;
+      const err=(r.issues||[]).find(i=>i.level==='error'); go.disabled=!!err;
+      if(err) info.textContent=err.msg;
+      else if(r.preview&&r.preview.count!==null) info.textContent=`${r.preview.count} mail(s) de la boîte de réception correspondent`;
+      else info.textContent=''; }
+    catch(e){ if(my===seq) info.textContent=e.message; } };
+  const sched=()=>{ clearTimeout(tm); tm=setTimeout(check,350); };
+  pv.oninput=sched; nt.oninput=sched; check();
+  const close=()=>d.remove();
+  d.onclick=e=>{ if(e.target===d) close(); };
+  d.querySelector('[data-p=no]').onclick=close;
+  go.onclick=async()=>{ go.disabled=true;
+    try{ await api('filters/save',{filter:model()}); FILTERS=[]; close(); toast('Règle créée'); }
+    catch(e){ info.textContent=e.message; go.disabled=false; } };
+}
 async function mMove(uids,dest){
   try{ await api('mail/move',{folder:MB.folder,uids,dest}); removeLocal(uids); const f=folderByName(dest); toast(`${uids.length} message(s) déplacé(s) vers « ${f?fLabel(f):dest} »`); loadFolders(); }
   catch(e){ toast('Erreur : '+e.message,'err'); } }
