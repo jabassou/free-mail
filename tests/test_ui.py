@@ -147,3 +147,17 @@ def test_new_view_and_collapsible_folders(browser, server, imap):
     page.wait_for_selector(".ngrp")
     assert page.evaluate("MB.folder") == "__new__" and page.evaluate("MB.filter") == ""
     assert errors == []
+
+
+def test_maintenance_simulate_opens_plan_panel_not_mail_menu(browser, server, imap):
+    """Regression: two functions named openDrawer; "Simulate" opened the mobile mail menu instead of the plan panel."""
+    imap.put(subject="maintenance ui")
+    for viewport in ({"width": 1400, "height": 900}, {"width": 390, "height": 800}):
+        page, errors = _page(browser, server, viewport=viewport, locale="en-US")
+        page.evaluate("tab('maint')")
+        page.wait_for_selector("[data-plan]")
+        page.locator("[data-plan]").first.click()
+        page.wait_for_selector("#planDrawer.on")
+        assert not page.evaluate("document.body.classList.contains('drawer-open')")
+        page.evaluate("closeDrawers()")
+        assert errors == []

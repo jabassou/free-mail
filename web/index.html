@@ -1172,8 +1172,9 @@ function toast(m,kind='ok',ms=4200,action){ const t=document.createElement('div'
   if(action){ const b=document.createElement('button'); b.className='tbtn'; b.textContent=action.label; b.onclick=()=>{ close(); action.fn(); }; t.appendChild(b); }
   setTimeout(close,ms); return {close,el:t}; }
 async function waitJob(id, logEl, onProgress){
+  let n=0;
   for(;;){ const j=await api('job?id='+id); if(logEl){logEl.textContent=j.logs.map(trLog).join('\n')||'…';logEl.scrollTop=1e9} if(onProgress) onProgress(j);
-    if(j.status==='done') return j.result; if(j.status==='error') throw new Error(j.error); await new Promise(r=>setTimeout(r,800)); }
+    if(j.status==='done') return j.result; if(j.status==='error') throw new Error(j.error); await new Promise(r=>setTimeout(r,Math.min(2500,800+n++*150))); }
 }
 const fmtT=s=>s<60?`${Math.round(s)} s`:`${Math.floor(s/60)} min ${String(Math.round(s%60)).padStart(2,'0')}`;
 function tracker(ids){ const g=k=>document.getElementById(ids[k]);
@@ -1195,7 +1196,7 @@ function countUp(el,to,suffix=''){ const t0=performance.now(), d=900;
   const step=t=>{ const p=Math.min(1,(t-t0)/d), e=1-Math.pow(1-p,3); el.textContent=num(Math.round(to*e))+suffix; if(p<1) requestAnimationFrame(step); }; requestAnimationFrame(step); }
 
 /* drawers */
-function openDrawer(id){ $('#scrim').classList.add('on'); $(id).classList.add('on'); }
+function openPanel(id){ $('#scrim').classList.add('on'); $(id).classList.add('on'); }
 function closeDrawers(){ $('#scrim').classList.remove('on'); $$('.drawer').forEach(d=>d.classList.remove('on')); }
 $('#scrim').onclick=closeDrawers; $$('[data-close]').forEach(b=>b.onclick=closeDrawers);
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawers();
@@ -1331,11 +1332,14 @@ async function loadMaint(){
     <h3>${esc(m.title)}</h3><p>${esc(m.desc)}</p><div><button class="btn ${m.danger?'':'primary'}" data-plan="${m.key}">${I('search','sm')}Simuler</button></div></div>`}).join('');
   $$('[data-plan]').forEach(b=>b.onclick=()=>{ const m=MAINT.find(x=>x.key===b.dataset.plan); runPlan('maintenance/plan',{key:m.key},m.title,m.danger,(MSTYLE[m.key]||['spark'])[0]); });
 }
+let PLAN_BUSY=false;
 async function runPlan(path,body,title,danger,ic='spark'){
+  if(PLAN_BUSY){ openPanel('#planDrawer'); return; } PLAN_BUSY=true;
   $('#planTitle').textContent=title; $('#planIc').innerHTML=I(ic); $('#planBody').innerHTML=''; $('#planFoot').innerHTML='<span class="small muted">Simulation en cours…</span>'; $('#planLog').textContent='…';
-  const T=PLANT(); T.reset('Simulation : recherche des mails concernés'); $('#planProg').classList.remove('hidden'); openDrawer('#planDrawer');
+  const T=PLANT(); T.reset('Simulation : recherche des mails concernés'); $('#planProg').classList.remove('hidden'); openPanel('#planDrawer');
   try{ const {job}=await api(path,body); const r=await waitJob(job,$('#planLog'),T.on); T.done(); setTimeout(()=>$('#planProg').classList.add('hidden'),350); renderPlan(r,danger); }
   catch(e){ $('#planProg').classList.add('hidden'); $('#planFoot').innerHTML=''; $('#planBody').innerHTML='<div class="issue error">'+I('alert')+'<div>'+esc(e.message)+'</div></div>'; }
+  finally{ PLAN_BUSY=false; }
 }
 const actTxt=a=>typeof a==='object'&&a?('→ '+(a.move||JSON.stringify(a))):a==='trash'?'→ Corbeille':String(a);
 function renderPlan(r,danger){
@@ -1430,7 +1434,7 @@ function openEditor(f,preset){
     +FILTERS.filter(x=>!f||x.name!==f.name).map(x=>`<option value="before:${esc(x.name)}">Avant #${x.position} · ${esc(x.name)}</option>`).join('')+'<option value="end">À la fin</option>';
   $('#edPos').value=f?'same':'top';
   $('#edResult').innerHTML=''; $('#edSave').disabled=true; $('#edForceWrap').classList.add('hidden'); $('#edForce').checked=false;
-  $('#editor .db').scrollTop=0; openDrawer('#editor'); setTimeout(()=>$('#edName').focus(),380);
+  $('#editor .db').scrollTop=0; openPanel('#editor'); setTimeout(()=>$('#edName').focus(),380);
 }
 function addCond(c={field:'from',op:'contains',value:''}){
   const d=document.createElement('div'); d.className='cond';
@@ -1508,7 +1512,7 @@ function wzSteps(){ return ['kind',...(wzNeedsWhat()?['what']:[]),'action',...(W
 function openWizard(preset){
   W={kind:null,values:[],action:null,folder:'',markRead:false,priority:null,name:'',nameTouched:false,discardOk:false,step:'kind',...(preset||{})};
   if(!FOLDERS.length) api('folders').then(f=>FOLDERS=f).catch(()=>{});
-  $('#wzNext').onclick=wzNext; WDIR=1; renderWz(); openDrawer('#wizard');
+  $('#wzNext').onclick=wzNext; WDIR=1; renderWz(); openPanel('#wizard');
 }
 function wzRecPriority(){ return ['sender','domain','subject'].includes(W.kind)?'top':'end'; }
 function wzSuggestName(){
