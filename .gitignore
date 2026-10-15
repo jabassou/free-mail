@@ -24,3 +24,4 @@ filters.fixed.json
 rules.yaml
 *.plist
 _to_delete/
+filters.yaml
