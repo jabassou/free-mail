@@ -43,6 +43,7 @@ import androidx.core.view.WindowInsetsCompat
 import org.json.JSONObject
 
 private const val LOCK_GRACE_MS = 30_000L // switching apps briefly does not ask again
+private const val LOCK_KEY = "fm-lock-v1" // Keystore AES key usable only right after the user authenticated
 private const val OPEN_COMPOSE_JS =
     "(function(){var t=window.FMAndroid&&FMAndroid.takeComposeTo();location.hash='compose'+(t?'&to='+encodeURIComponent(t):'')})()"
 
@@ -299,37 +300,93 @@ class MainActivity : ComponentActivity() {
         super.onPause()
     }
 
-    /** Fingerprint / face, or the phone PIN / pattern as fallback. */
-    private fun authenticate() {
+    /**
+     * Cipher backed by a Keystore key that the hardware only releases right after the user authenticated.
+     * The unlock then depends on a cryptographic operation, not on a callback that could be hooked.
+     */
+    private fun lockCipher(): javax.crypto.Cipher {
+        val ks = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        fun make(): javax.crypto.SecretKey {
+            val props = android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or android.security.keystore.KeyProperties.PURPOSE_DECRYPT
+            val spec = android.security.keystore.KeyGenParameterSpec.Builder(LOCK_KEY, props)
+                .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setUserAuthenticationRequired(true)
+                .setInvalidatedByBiometricEnrollment(false)
+            if (Build.VERSION.SDK_INT >= 30) {
+                spec.setUserAuthenticationParameters(0,
+                    android.security.keystore.KeyProperties.AUTH_BIOMETRIC_STRONG or android.security.keystore.KeyProperties.AUTH_DEVICE_CREDENTIAL)
+            }
+            val gen = javax.crypto.KeyGenerator.getInstance(android.security.keystore.KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+            gen.init(spec.build())
+            return gen.generateKey()
+        }
+        val key = (ks.getKey(LOCK_KEY, null) as? javax.crypto.SecretKey) ?: make()
+        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+        try {
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key)
+        } catch (e: android.security.keystore.KeyPermanentlyInvalidatedException) {
+            ks.deleteEntry(LOCK_KEY)
+            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, make())
+        }
+        return cipher
+    }
+
+    /**
+     * Fingerprint / face, or the phone PIN / pattern as fallback.
+     * Android 11+: the success must also unlock the Keystore key (strong biometrics or PIN).
+     * Without it (Android 10, no secure lock screen, key error) it falls back to a plain prompt so nobody is locked out.
+     */
+    private fun authenticate(useCrypto: Boolean = true) {
         if (prompting) return
         prompting = true
         dismissed = false
+        val crypto = if (useCrypto && Build.VERSION.SDK_INT >= 30) {
+            try { BiometricPrompt.CryptoObject(lockCipher()) } catch (e: Exception) { Log.w("FreeMail", "lock key unavailable, plain prompt", e); null }
+        } else null
         val b = BiometricPrompt.Builder(this)
             .setTitle(getString(R.string.lock_title))
             .setSubtitle(Prefs(this).user ?: "")
         if (Build.VERSION.SDK_INT >= 30) {
-            b.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+            val level = if (crypto != null) BiometricManager.Authenticators.BIOMETRIC_STRONG else BiometricManager.Authenticators.BIOMETRIC_WEAK
+            b.setAllowedAuthenticators(level or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
         } else {
             @Suppress("DEPRECATION") b.setDeviceCredentialAllowed(true)
         }
-        try {
-            b.build().authenticate(CancellationSignal(), mainExecutor, object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    prompting = false
-                    unlocked = true
-                    pausedAt = android.os.SystemClock.elapsedRealtime()
-                    lockView.visibility = View.GONE
+        val callback = object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                val cipher = result.cryptoObject?.cipher
+                if (cipher != null) {
+                    try {
+                        cipher.doFinal(ByteArray(16)) // only works if the user really authenticated
+                    } catch (e: Exception) {
+                        prompting = false
+                        dismissed = true
+                        Log.e("FreeMail", "lock key refused", e)
+                        lockView.setMessage(e.message ?: "")
+                        return
+                    }
                 }
+                prompting = false
+                unlocked = true
+                pausedAt = android.os.SystemClock.elapsedRealtime()
+                lockView.visibility = View.GONE
+            }
 
-                override fun onAuthenticationError(code: Int, msg: CharSequence) {
-                    prompting = false
-                    dismissed = true
-                    lockView.setMessage(msg.toString()) // stays locked; the button retries
-                }
-            })
+            override fun onAuthenticationError(code: Int, msg: CharSequence) {
+                prompting = false
+                dismissed = true
+                lockView.setMessage(msg.toString()) // stays locked; the button retries
+            }
+        }
+        try {
+            val prompt = b.build()
+            if (crypto != null) prompt.authenticate(crypto, CancellationSignal(), mainExecutor, callback)
+            else prompt.authenticate(CancellationSignal(), mainExecutor, callback)
         } catch (e: Exception) {
             prompting = false
             Log.e("FreeMail", "biometric prompt", e)
+            if (crypto != null) { authenticate(useCrypto = false); return }
             lockView.setMessage(e.message ?: "")
         }
     }
