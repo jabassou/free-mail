@@ -177,7 +177,7 @@ release-manual: ## Manual full release without the Action: release-pr + promote 
 # Runs .github/workflows/release.yml from main: computes the next version, bumps dev,
 # promotes dev -> main, tags, waits for the APK. You only approve the "release" deployment.
 .PHONY: release
-release: ## Automated release; bump guessed from commit titles (feat -> minor, ! -> major, else patch); BUMP=minor to force
+release: ## Automated release, approves the deployment for you; bump guessed from commit titles (BUMP=minor to force, APPROVE=0 to approve in the UI)
 	@git remote get-url origin | grep -q "$(REPO)" || { echo "wrong repository"; exit 1; }
 	@git fetch -q origin
 	@SUBJ=$$(git log --format=%s origin/main..origin/dev); \
@@ -197,8 +197,21 @@ _release-run:
 	@echo "Next: $$(git show origin/main:VERSION 2>/dev/null | tr -d '[:space:]') -> bump $(BUMP)"
 	@read -rp "Start the $(BUMP) release? [y/N] " a; [ "$$a" = y ] || { echo aborted; exit 1; }
 	gh workflow run release.yml -R $(REPO) --ref main -f bump=$(BUMP)
-	@sleep 8; ID=$$(gh run list -R $(REPO) --workflow release.yml --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId'); \
-	  echo "Run $$ID: approve the 'release' deployment in the GitHub UI (or the notification)"; \
+	@for i in $$(seq 1 20); do \
+	  ID=$$(gh run list -R $(REPO) --workflow release.yml --event workflow_dispatch --limit 5 --json databaseId,status --jq '[.[]|select(.status!="completed")][0].databaseId // empty'); \
+	  [ -n "$$ID" ] && break; sleep 3; done; \
+	  [ -n "$$ID" ] || { echo "run not found: check the Actions tab"; exit 1; }; \
+	  echo "Run $$ID"; \
+	  if [ "$(APPROVE)" = "0" ]; then echo "Approve the 'release' deployment in the GitHub UI"; \
+	  else \
+	    for i in $$(seq 1 30); do \
+	      ENV=$$(gh api repos/$(REPO)/actions/runs/$$ID/pending_deployments --jq '.[0].environment.id // empty' 2>/dev/null); \
+	      [ -n "$$ENV" ] && break; sleep 3; done; \
+	    if [ -n "$$ENV" ]; then \
+	      gh api -X POST repos/$(REPO)/actions/runs/$$ID/pending_deployments -F "environment_ids[]=$$ENV" -f state=approved -f comment="make release" >/dev/null \
+	        && echo "Deployment approved"; \
+	    else echo "No pending approval found (already approved?)"; fi; \
+	  fi; \
 	  gh run watch -R $(REPO) "$$ID" --exit-status
 
 .PHONY: release-patch
