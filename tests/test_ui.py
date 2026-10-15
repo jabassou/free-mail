@@ -127,6 +127,7 @@ def test_phone_no_horizontal_overflow(browser, server):
 
 def test_new_view_and_collapsible_folders(browser, server, imap):
     subject = imap.put(folder="Jobs/Alerts", subject="ui new view")
+    other = imap.put(folder="Jobs/Alerts", subject="ui new view still unread")  # keeps the "New" list non-empty once the first one is read
     page, errors = _page(browser, server, viewport={"width": 1400, "height": 900}, locale="en-US")
     page.evaluate("localStorage.setItem('fm-newp','all')")
     page.click("#mFolders [data-fold='__new__']")
@@ -145,6 +146,7 @@ def test_new_view_and_collapsible_folders(browser, server, imap):
     assert page.evaluate("MB.folder") == "Jobs/Alerts" and page.evaluate("MB.filter") == "unseen"
     page.click("#mBackNew")
     page.wait_for_selector(".ngrp")
+    page.wait_for_selector(f".ngrp .mrow:has-text('{other}')")
     assert page.evaluate("MB.folder") == "__new__" and page.evaluate("MB.filter") == ""
     assert errors == []
 
