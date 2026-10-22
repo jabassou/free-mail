@@ -49,8 +49,23 @@ reset-venv: ## Rebuild the venv from scratch (after a Python upgrade)
 	$(MAKE) install
 
 # ------------------------------------------------------------------ run
+.PHONY: self-update
+self-update: ## Fast-forward main to origin/main when safe (clean tree, right repo); UPDATE=0 to skip
+	@[ "$(UPDATE)" = "0" ] && exit 0; \
+	git rev-parse --git-dir >/dev/null 2>&1 || exit 0; \
+	url=$$(git remote get-url origin 2>/dev/null); \
+	case "$$url" in *"$(REPO)"*) ;; *) echo "update: origin is not $(REPO), skipped"; exit 0;; esac; \
+	[ "$$(git branch --show-current)" = "main" ] || { echo "update: not on main, skipped"; exit 0; }; \
+	timeout 10 git fetch -q origin main --tags 2>/dev/null || { echo "update: offline, skipped"; exit 0; }; \
+	n=$$(git rev-list --count HEAD..origin/main); \
+	[ "$$n" -gt 0 ] || { echo "update: up to date (v$$(cat $(VERSION_FILE)))"; exit 0; }; \
+	[ -z "$$(git status --porcelain --untracked-files=no)" ] || { echo "update: $$n new commit(s) but local changes present, skipped"; exit 0; }; \
+	old=$$(cat $(VERSION_FILE)); git merge -q --ff-only origin/main \
+	  && echo "update: v$$old -> v$$(cat $(VERSION_FILE)) ($$n commit(s))" \
+	  || echo "update: fast-forward failed, skipped"
+
 .PHONY: start
-start: install config ## Install if needed, ask for the password if none is stored, start the UI
+start: self-update install config ## Update from origin/main if safe, install if needed, ask for the password if none is stored, start the UI
 	@$(PY) -c 'import freemail as f; f.get_password(f.load_config("config.yaml")["user"])' >/dev/null 2>&1 \
 	  || { echo "No stored password: running auth"; $(PY) freemail.py auth; }
 	$(PY) webui.py
