@@ -141,8 +141,16 @@ def test_new_view_and_collapsible_folders(browser, server, imap):
     assert page.evaluate("JSON.parse(localStorage.getItem('fm-closed')).includes(':sec:folders')")
     page.click("#mFolders [data-fsec]")
     assert page.locator("#mFolders [data-fold='Jobs']").count() == 1
-    # a mail opens in its folder (unread filter) with a way back to "New"
+    # a mail opens in the reader pane and the view stays on "New" (rows keep their folder)
     page.locator(f".ngrp .mrow:has-text('{subject}')").first.click()
+    page.wait_for_selector("#mRead .mbody h1")
+    assert page.evaluate("MB.folder") == "__new__" and page.evaluate("RF()") == "Jobs/Alerts"
+    assert page.inner_text("#mRead .mbody h1") == subject
+    page.wait_for_selector(f".ngrp .mrow.on:has-text('{subject}')")
+    page.wait_for_function("!document.querySelector(\".ngrp .mrow.on\").classList.contains('unseen')")
+    page.wait_for_selector(f".ngrp .mrow:has-text('{other}')")
+    # the folder button still opens the folder (unread filter) with a way back to "New"
+    page.locator(".ngh[data-ngt='Jobs/Alerts'] [data-nopen]").click()
     page.wait_for_selector("#mBackNew.on")
     assert page.evaluate("MB.folder") == "Jobs/Alerts" and page.evaluate("MB.filter") == "unseen"
     page.click("#mBackNew")
@@ -176,4 +184,20 @@ def test_report_phishing_moves_to_spam(browser, server, imap):
     page.click("#rPhish")
     wait_for(lambda: imap.find("Junk", subject))
     assert not imap.find("INBOX", subject)
+    assert errors == []
+
+
+def test_new_view_reader_actions_use_the_mail_folder(browser, server, imap):
+    imap.ensure("Junk")
+    folder = "Jobs/Alerts"
+    subject = imap.put(folder=folder, subject=f"new view action {os.urandom(3).hex()}")
+    page, errors = _page(browser, server, viewport={"width": 1400, "height": 900}, locale="en-US")
+    page.evaluate("localStorage.setItem('fm-newp','all')")
+    page.click("#mFolders [data-fold='__new__']")
+    page.locator(f".ngrp .mrow:has-text('{subject}')").first.click()
+    page.wait_for_selector("#rPhish")
+    page.click("#rPhish")  # moves the open mail (from its own folder, not "__new__") to Spam
+    wait_for(lambda: imap.find("Junk", subject))
+    assert not imap.find(folder, subject)
+    assert page.evaluate("MB.folder") == "__new__"
     assert errors == []
