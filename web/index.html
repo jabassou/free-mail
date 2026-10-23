@@ -1664,6 +1664,8 @@ async function openMail(){ $('.main').classList.add('full'); await loadFolders()
 const MUTE_ROLES=['sent','drafts','trash','junk'];
 // ---- "New": unread mail of every folder, one block per folder
 const NEWV='__new__', SEC_KEY=':sec:folders', L2=(fr,en)=>LANG==='fr'?fr:en;
+// folder of the open message: in the "New" view the list mixes folders, so the reader remembers its own (MB.rfolder)
+const RF=()=>MB.folder===NEWV&&MB.rfolder?MB.rfolder:MB.folder;
 const lsGet=(k,d)=>{ try{ const v=localStorage.getItem(k); return v==null?d:v; }catch(e){ return d; } }, lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 const NEW={period:lsGet('fm-newp','visit'),data:null,more:{},closed:new Set((()=>{ try{ return JSON.parse(lsGet('fm-newc','[]')); }catch(e){ return []; } })()),seq:0};
 const midnight=()=>{ const d=new Date(); d.setHours(0,0,0,0); return d.getTime()/1000; };
@@ -1678,14 +1680,26 @@ const fPath=f=>{ const p=f.depth&&f.parent?folderByName(f.parent):null; return (
 function setFilter(v){ MB.filter=v; $$('[data-mf]').forEach(x=>x.classList.toggle('on',(x.dataset.mf||'')===v)); }
 function leaveNewCtx(){ if(MB.backNew){ MB.backNew=false; setFilter(''); } }
 const nsegHtml=()=>`<div class="nseg">${[['today',L2("Aujourd'hui",'Today')],['visit',L2('Depuis ma visite','Since last visit')],['all',L2('Tous','All')]].map(([k,l])=>`<button data-np="${k}" class="${NEW.period===k?'on':''}">${l}</button>`).join('')}</div>`;
+// set the seen flag of items in the cached "New" data and in the visible rows; returns how many changed
+function newSetSeen(folder,uids,on){ if(on===null) return 0; let n=0;
+  const upd=a=>(a||[]).forEach(x=>{ if(uids.includes(x.uid)&&x.seen!==on){ x.seen=on; n++; } });
+  (NEW.data?.groups||[]).forEach(g=>{ if(g.folder===folder) upd(g.items); }); if(NEW.more[folder]) upd(NEW.more[folder]);
+  uids.forEach(u=>{ const row=$(`#mRows .mrow[data-nf="${CSS.escape(folder)}"][data-nu="${u}"]`); if(!row) return;
+    row.classList.toggle('unseen',!on); if(on) row.querySelector('.dot')?.remove(); });
+  return n; }
+// open a mail of the "New" view in the reader pane without leaving the view
+function openNewMsg(folder,uid){ MB.rfolder=folder;
+  const p=openMsg(uid);
+  $$('#mRows .mrow[data-nu]').forEach(r=>r.classList.toggle('on',r.dataset.nf===folder&&r.dataset.nu===uid));
+  return p; }
 async function loadNew(reset){
-  const seq=++NEW.seq; MB.items=[]; MB.view=[]; MB.gmap=new Map(); MB.sel.clear(); MB.cur=null; updateBulk();
+  const seq=++NEW.seq; MB.items=[]; MB.view=[]; MB.gmap=new Map(); MB.sel.clear(); if(!(MB.rfolder&&MB.cur)) MB.cur=null; updateBulk();
   $('#mTitle').textContent=L2('Nouveaux','New');
   if(reset){ $('#mRows').innerHTML=nsegHtml()+Array(5).fill('<div style="padding:12px 14px;display:grid;grid-template-columns:34px 1fr;gap:10px"><div class="sk" style="height:34px"></div><div><div class="sk" style="height:12px;width:60%"></div><div class="sk" style="height:10px;width:85%;margin-top:8px"></div></div></div>').join(''); wireNew(); }
   try{ const d=await api(`mail/new?since=${Math.floor(newSince())}&per=3`); if(seq!==NEW.seq||MB.folder!==NEWV) return; NEW.data=d; NEW.more={}; renderNew(); }
   catch(e){ if(seq!==NEW.seq) return; $('#mRows').innerHTML=nsegHtml()+'<div class="issue error" style="margin:12px">'+I('alert')+'<div>'+esc(e.message)+'</div></div>'; wireNew(); }
 }
-function nRow(g,it){ return `<div class="mrow ${it.seen?'':'unseen'}" data-nf="${esc(g.folder)}" data-nu="${it.uid}">${it.seen?'':'<span class="dot"></span>'}${avatar(it.from?.email||it.from?.name)}
+function nRow(g,it){ return `<div class="mrow ${it.seen?'':'unseen'} ${MB.folder===NEWV&&MB.rfolder===g.folder&&MB.cur===it.uid?'on':''}" data-nf="${esc(g.folder)}" data-nu="${it.uid}">${it.seen?'':'<span class="dot"></span>'}${avatar(it.from?.email||it.from?.name)}
   <div style="min-width:0" translate="no"><div class="mtop"><span class="from">${esc(who(it.from))}</span><span class="flags">${it.attachment?I('clip'):''}</span><span class="date">${mdate(it.date)}</span></div>
   <div class="subj">${esc(it.subject||'(sans objet)')}</div><div class="snip">${esc(it.snippet||'')}</div></div></div>`; }
 function renderNew(){
@@ -1710,7 +1724,7 @@ function wireNew(){
   $$('[data-nmore]').forEach(b=>b.onclick=async()=>{ const n=b.dataset.nmore, have=(NEW.more[n]||[]).length||3; b.disabled=true;
     try{ const r=await api(`mail/new?since=${Math.floor(newSince())}&per=${Math.min(200,have+50)}&folder=${encodeURIComponent(n)}`); const g=r.groups[0]; if(g){ NEW.more[n]=g.items; const og=NEW.data.groups.find(x=>x.folder===n); if(og) og.count=g.count; } renderNew(); }
     catch(e){ b.disabled=false; toast(e.message,'err'); } });
-  $$('#mRows .mrow[data-nu]').forEach(r=>r.onclick=()=>openFromNew(r.dataset.nf,r.dataset.nu));
+  $$('#mRows .mrow[data-nu]').forEach(r=>r.onclick=()=>openNewMsg(r.dataset.nf,r.dataset.nu));
 }
 async function newMarkRead(names){ if(!names.length) return; let r;
   try{ r=await api('mail/new/read',{folders:names,since:Math.floor(newSince())}); }catch(e){ toast(e.message,'err'); return; }
@@ -1833,7 +1847,7 @@ async function openMsg(uid,remote=false){
   const row=$(`#mRows .mrow[data-uid="${uid}"]`); row?.scrollIntoView({block:'nearest'});
   openReaderPane();
   $('#mRead').innerHTML=`<div class="mtool"><div class="sk" style="height:28px;width:260px"></div></div><div class="mbody"><div class="sk" style="height:26px;width:70%"></div><div class="row" style="margin:18px 0"><div class="sk" style="width:42px;height:42px"></div><div class="grow"><div class="sk" style="height:12px;width:40%"></div><div class="sk" style="height:10px;width:60%;margin-top:8px"></div></div></div><div class="sk" style="height:300px"></div></div>`;
-  let m; try{ m=await api(`mail/msg?folder=${encodeURIComponent(MB.folder)}&uid=${uid}`); }catch(e){ $('#mRead').innerHTML='<div class="mbody"><div class="issue error">'+I('alert')+'<div>'+esc(e.message)+'</div></div></div>'; return; }
+  let m; try{ m=await api(`mail/msg?folder=${encodeURIComponent(RF())}&uid=${uid}`); }catch(e){ $('#mRead').innerHTML='<div class="mbody"><div class="issue error">'+I('alert')+'<div>'+esc(e.message)+'</div></div></div>'; return; }
   if(MB.cur!==uid) return; MB.msg=m;
   markSeenLocal(uid);
   const from=m.from[0]||{};
@@ -1880,7 +1894,9 @@ async function unsubscribe(m,btn){ const who=(m.from[0]?.name||m.from[0]?.email|
 // links inside the app (dashboard, toasts…) and in mail bodies open in the external browser
 document.addEventListener('click',e=>{ const a=e.target.closest&&e.target.closest('a[href]'); if(!a) return; const h=a.getAttribute('href')||'';
   if(/^(https?:|mailto:)/i.test(h)&&window.FMAndroid){ e.preventDefault(); FMAndroid.openUrl(a.href); } });
-function markSeenLocal(uid){ const it=MB.items.find(x=>x.uid===uid); if(!it||it.seen) return; it.seen=true;
+function markSeenLocal(uid){
+  if(MB.folder===NEWV){ const n=newSetSeen(RF(),[uid],true); if(n){ const f=folderByName(RF()); if(f&&f.unseen){ f.unseen--; loadFoldersLight(); } } return; }
+  const it=MB.items.find(x=>x.uid===uid); if(!it||it.seen) return; it.seen=true;
   const g=MB.gmap.get(uid), row=$(`#mRows .mrow[data-uid="${g?g.rep.uid:uid}"]`);
   if(row&&(!g||g.items.every(x=>x.seen))){ row.classList.remove('unseen'); row.querySelector('.dot')?.remove(); }
   const f=folderByName(MB.folder); if(f&&f.unseen){ f.unseen--; loadFoldersLight(); } }
@@ -1952,7 +1968,7 @@ async function toggleCard(i,open,remote=false){
   tb.querySelector('[data-unsub]')?.addEventListener('click',e=>unsubscribe(m,e.currentTarget));
   tb.querySelectorAll('[data-att]').forEach(b=>b.onclick=()=>downloadAtt(m,+b.dataset.att,b));
   if(i===t.items.length-1) MB.msg=m; }
-function loadFoldersLight(){ const f=folderByName(MB.folder); const el=$(`[data-fold="${CSS.escape(MB.folder)}"] .cnt`); if(el){ if(f.unseen) el.textContent=num(f.unseen); else el.remove(); } updateUnreadIndicators(); }
+function loadFoldersLight(){ const f=folderByName(RF()); const el=$(`[data-fold="${CSS.escape(RF())}"] .cnt`); if(el&&f){ if(f.unseen) el.textContent=num(f.unseen); else el.remove(); } updateUnreadIndicators(); }
 const ATT_STYLE=t=>t.includes('pdf')?['#ef4444','PDF']:t.startsWith('image/')?['#8b5cf6','IMG']:/sheet|excel|csv/.test(t)?['#22c55e','XLS']:/word|document/.test(t)?['#3b82f6','DOC']:/zip|compressed/.test(t)?['#f59e0b','ZIP']:['#64748b','FIC'];
 const fsize=b=>{ const [o,k,M]=LANG==='fr'?['o','Ko','Mo']:['B','KB','MB']; return b<1024?b+' '+o:b<1048576?(b/1024).toFixed(0)+' '+k:(b/1048576).toFixed(1)+' '+M; };
 function attCard(a){ const [c,l]=ATT_STYLE(a.type); return `<button class="att" data-att="${a.part}" title="Télécharger"><div class="fi" style="background:${c}"><b style="font-size:10px">${l}</b></div><div style="min-width:0;flex:1"><div class="nm">${esc(a.filename)}</div><div class="tiny muted">${fsize(a.size)}</div></div>${I('dl','sm')}</button>`; }
@@ -1966,17 +1982,22 @@ async function downloadAtt(m,part,btn){ const a=m.attachments.find(x=>x.part===p
 
 /* ---- actions */
 async function mFlag(uids,flag,on){
-  try{ await api('mail/flag',{folder:MB.folder,uids,flag,on});
+  try{ await api('mail/flag',{folder:RF(),uids,flag,on});
+    if(MB.folder===NEWV) newSetSeen(RF(),uids,flag==='seen'?on:null);
     MB.items.forEach(it=>{ if(uids.includes(it.uid)){ if(flag==='seen') it.seen=on; else it.flagged=on; } });
-    if(flag==='seen'){ const f=folderByName(MB.folder); if(f) f.unseen=Math.max(0,f.unseen+(on?-1:1)*uids.length); loadFoldersLight(); }
-    MB.sel.clear(); renderRows(); }catch(e){ toast('Erreur : '+e.message,'err'); } }
+    if(flag==='seen'){ const f=folderByName(RF()); if(f) f.unseen=Math.max(0,f.unseen+(on?-1:1)*uids.length); loadFoldersLight(); }
+    MB.sel.clear(); if(MB.folder===NEWV) renderNew(); else renderRows(); }catch(e){ toast('Erreur : '+e.message,'err'); } }
 function nextUid(uids){ const v=MB.view||[]; const idx=v.findIndex(g=>g.items.some(x=>uids.includes(x.uid))); const rest=v.filter(g=>!g.items.some(x=>uids.includes(x.uid))); return rest[Math.min(idx,rest.length-1)]?.rep.uid; }
-function removeLocal(uids){ const nx=MB.cur&&uids.includes(MB.cur)?nextUid(uids):null; MB.items=MB.items.filter(x=>!uids.includes(x.uid)); MB.total-=uids.length; MB.sel.clear(); renderRows(); $('#mCount').textContent=`${num(MB.total)} messages`;
+function removeLocal(uids){
+  if(MB.folder===NEWV){ const f=RF(); const gone=MB.cur&&uids.includes(MB.cur); const strip=a=>a.filter(x=>!uids.includes(x.uid));
+    (NEW.data?.groups||[]).forEach(g=>{ if(g.folder===f) g.items=strip(g.items); }); if(NEW.more[f]) NEW.more[f]=strip(NEW.more[f]);
+    if(gone){ MB.cur=null; MB.rfolder=null; showEmptyReader(); } renderNew(); loadNew(false); return; }
+  const nx=MB.cur&&uids.includes(MB.cur)?nextUid(uids):null; MB.items=MB.items.filter(x=>!uids.includes(x.uid)); MB.total-=uids.length; MB.sel.clear(); renderRows(); $('#mCount').textContent=`${num(MB.total)} messages`;
   if(MB.cur&&uids.includes(MB.cur)){ MB.cur=null; nx&&!matchMedia('(max-width:860px)').matches?openRow(nx):showEmptyReader(); } }
 async function mDelete(uids){
-  const inTrash=folderByName(MB.folder)?.role==='trash';
+  const inTrash=folderByName(RF())?.role==='trash';
   if(inTrash&&!confirm(`Supprimer définitivement ${uids.length} message(s) ? Irréversible.`)) return;
-  try{ await api('mail/delete',{folder:MB.folder,uids}); removeLocal(uids); toast(inTrash?`${uids.length} message(s) supprimé(s) définitivement`:`${uids.length} message(s) mis à la corbeille`); loadFolders(); }
+  try{ await api('mail/delete',{folder:RF(),uids}); removeLocal(uids); toast(inTrash?`${uids.length} message(s) supprimé(s) définitivement`:`${uids.length} message(s) mis à la corbeille`); loadFolders(); }
   catch(e){ toast('Erreur : '+e.message,'err'); } }
 function phishPattern(subject){
   const words=normSubj(subject||'').split(/\s+/).filter(Boolean).filter(w=>!(/^[0-9a-f]{8,}$/i.test(w)||/^#?\d{5,}$/.test(w)||(/\d/.test(w)&&/[a-z]/i.test(w)&&w.length>=6)));
@@ -1984,8 +2005,8 @@ function phishPattern(subject){
 async function mPhish(uids,subject){
   const junk=MB.folders.find(f=>f.role==='junk');
   if(!junk){ toast('Aucun dossier Spam trouvé','err'); return; }
-  if(MB.folder===junk.name){ toast('Ce message est déjà dans le Spam','err'); return; }
-  try{ await api('mail/move',{folder:MB.folder,uids,dest:junk.name}); removeLocal(uids); loadFolders(); }
+  if(RF()===junk.name){ toast('Ce message est déjà dans le Spam','err'); return; }
+  try{ await api('mail/move',{folder:RF(),uids,dest:junk.name}); removeLocal(uids); loadFolders(); }
   catch(e){ toast('Erreur : '+e.message,'err'); return; }
   toast('Message déplacé dans le Spam');
   const pat=phishPattern(subject);
@@ -2024,13 +2045,13 @@ function phishRuleDialog(pat){
     catch(e){ info.textContent=e.message; go.disabled=false; } };
 }
 async function mMove(uids,dest){
-  try{ await api('mail/move',{folder:MB.folder,uids,dest}); removeLocal(uids); const f=folderByName(dest); toast(`${uids.length} message(s) déplacé(s) vers « ${f?fLabel(f):dest} »`); loadFolders(); }
+  try{ await api('mail/move',{folder:RF(),uids,dest}); removeLocal(uids); const f=folderByName(dest); toast(`${uids.length} message(s) déplacé(s) vers « ${f?fLabel(f):dest} »`); loadFolders(); }
   catch(e){ toast('Erreur : '+e.message,'err'); } }
 function moveMenu(anchor,uids){
   document.querySelector('.menu')?.remove();
   const m=document.createElement('div'); m.className='menu'; const r=anchor.getBoundingClientRect();
   m.style.left=Math.min(r.left,innerWidth-250)+'px'; m.style.top=(r.bottom+6+scrollY)+'px';
-  const list=MB.folders.filter(f=>f.selectable&&f.name!==MB.folder);
+  const list=MB.folders.filter(f=>f.selectable&&f.name!==RF());
   const draw=q=>m.querySelector('.ml').innerHTML=list.filter(f=>!q||f.name.toLowerCase().includes(q.toLowerCase())).map(f=>`<button data-to="${esc(f.name)}" style="padding-left:${10+f.depth*12}px">${I(ROLE_IC[f.role]||'folder','sm')}${esc(fLabel(f))}</button>`).join('')||'<div class="small muted" style="padding:8px">Aucun dossier</div>';
   m.innerHTML='<input placeholder="Déplacer vers…"><div class="ml"></div>'; document.body.appendChild(m); draw('');
   const inp=m.querySelector('input'); inp.focus(); inp.oninput=()=>{ draw(inp.value); bind(); };
@@ -2402,7 +2423,7 @@ function whenMenu(anchor,kind,cb){ document.querySelector('.menu')?.remove();
   const outside=e=>{ if(!m.contains(e.target)&&e.target!==anchor&&!anchor.contains(e.target)){ m.remove(); document.removeEventListener('click',outside,true); } };
   setTimeout(()=>document.addEventListener('click',outside,true),0); }
 async function mSnooze(uids,ts){
-  try{ await api('mail/snooze',{folder:MB.folder,uids,until:ts}); removeLocal(uids); toast(`Mis en attente jusqu'à ${fmtWhen(ts)}`); loadFolders(); }
+  try{ await api('mail/snooze',{folder:RF(),uids,until:ts}); removeLocal(uids); toast(`Mis en attente jusqu'à ${fmtWhen(ts)}`); loadFolders(); }
   catch(e){ toast('Erreur : '+e.message,'err'); } }
 
 /* ---- undo send / send later: the mail goes to the local outbox and the server sends it when due */
