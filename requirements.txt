@@ -1,4 +1,4 @@
 PyYAML>=6.0.3
 keyring>=25.7.0
 requests>=2.34.2
-playwright>=1.64.0   # optional: browser fallback for automatic webmail login (uses installed Chrome)
+playwright>=1.64.1   # optional: browser fallback for automatic webmail login (uses installed Chrome)
