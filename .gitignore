@@ -25,3 +25,6 @@ rules.yaml
 *.plist
 _to_delete/
 filters.yaml
+dist-mac/
+build/
+*.dmg

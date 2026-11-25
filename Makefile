@@ -78,6 +78,20 @@ ui: $(PY) ## Start the local web UI (opens the browser)
 ui-bg: $(PY) ## Web UI without opening the browser, with background notifications (log)
 	$(PY) webui.py --no-browser --imap-session --notify log
 
+.PHONY: app-dev
+app-dev: install ## Run the macOS app (native window) from the sources
+	$(PIP) install -q -r macos/requirements.txt
+	$(PY) macapp.py
+
+.PHONY: app
+app: install ## Build "Free Mail.app" and the .dmg (macOS only)
+	PYTHON=$(PY) macos/build-app.sh
+
+.PHONY: app-install
+app-install: app ## Build the app and copy it to /Applications
+	rm -rf "/Applications/Free Mail.app" && cp -R "dist-mac/Free Mail.app" /Applications/
+	@echo "installed: /Applications/Free Mail.app"
+
 .PHONY: auth
 auth: $(PY) ## Store the Free password in the Keychain and test IMAP
 	$(PY) freemail.py auth

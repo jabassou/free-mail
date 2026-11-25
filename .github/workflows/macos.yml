@@ -1,0 +1,49 @@
+name: macos
+
+# Push a tag (the release workflow does it) to build the macOS app and attach the .dmg to the
+# GitHub release published by apk.yml.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    permissions:
+      contents: write   # attach the .dmg to the release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: echo "${GITHUB_REF_NAME#v}" > VERSION
+
+      - name: Build the app
+        run: |
+          python -m venv .venv
+          PYTHON=.venv/bin/python macos/build-app.sh
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: FreeMail-macos
+          path: FreeMail-v*-macos-*.dmg
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # apk.yml creates the release: wait for it instead of racing it
+          for _ in $(seq 1 45); do gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && break; sleep 20; done
+          gh release view "$GITHUB_REF_NAME" >/dev/null
+          gh release upload "$GITHUB_REF_NAME" FreeMail-v*-macos-*.dmg --clobber
