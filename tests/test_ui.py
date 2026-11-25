@@ -201,3 +201,29 @@ def test_new_view_reader_actions_use_the_mail_folder(browser, server, imap):
     assert not imap.find(folder, subject)
     assert page.evaluate("MB.folder") == "__new__"
     assert errors == []
+
+
+def test_sounds_engine_and_settings(browser, server):
+    page, errors = _page(browser, server, viewport={"width": 1400, "height": 900}, locale="en-US")
+    # every preset renders to finite, audible, non-clipping samples
+    assert page.evaluate("""Object.entries(SOUNDS).every(([kind, m]) => Object.keys(m).every(n => {
+        const p = sndEntry(kind, n).pcm; let mx = 0, ok = true;
+        for (const v of p) { if (!Number.isFinite(v)) ok = false; mx = Math.max(mx, Math.abs(v)); }
+        return ok && mx > 0.5 && mx <= 1; }))""")
+    assert page.evaluate("Object.keys(SOUNDS.recv).length") >= 5 and page.evaluate("Object.keys(SOUNDS.send).length") >= 4
+    page.evaluate("tab('settings')")
+    page.wait_for_selector("#sSndRecv option", state="attached")
+    assert page.locator("#sSndRecv option").count() == len(page.evaluate("Object.keys(SOUNDS.recv)")) + 1  # + "None"
+    assert "None" in page.inner_text("#sSndSend")
+    page.evaluate("window.__played = []; window.playSound = (k, key) => { window.__played.push([k, key]); return Promise.resolve('test'); }; null")
+    page.select_option("#sSndRecv", "bell")   # choosing a sound previews it and is remembered
+    page.select_option("#sSndSend", "ding")
+    assert page.evaluate("window.__played") == [["recv", "bell"], ["send", "ding"]]
+    assert page.evaluate("JSON.parse(localStorage.getItem('fm-notif')).recv") == "bell"
+    assert page.evaluate("JSON.parse(localStorage.getItem('fm-notif')).send") == "ding"
+    # sending plays the "send" sound, unless sounds are off
+    page.evaluate("window.__played = []; sendSound()")
+    assert page.evaluate("window.__played") == [["send", "ding"]]
+    page.evaluate("window.__played = []; NP.sound = false; sendSound()")
+    assert page.evaluate("window.__played") == []
+    assert errors == []

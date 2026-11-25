@@ -211,6 +211,13 @@ def _http_get(url: str, headers: dict) -> tuple[int, dict, bytes]:
         raise
 
 
+def _pick_dmg(dmgs: dict) -> str | None:
+    """The macOS build for this machine's architecture (FreeMail-vX-macos-arm64.dmg), else any .dmg."""
+    import platform
+    arch = platform.machine()
+    return next((u for n, u in dmgs.items() if arch in n), next(iter(dmgs.values()), None))
+
+
 def check_update(current: str, force: bool = False) -> dict:
     """Latest release of the app, cached UPDATE_EVERY seconds (ETag: an unchanged release costs no quota)."""
     with _upd_lock:
@@ -227,7 +234,9 @@ def check_update(current: str, force: bool = False) -> dict:
                         "tag": rel.get("tag_name") or "", "url": rel.get("html_url"),
                         "notes": (rel.get("body") or "")[:4000],
                         "apk": next((a["browser_download_url"] for a in rel.get("assets", [])
-                                     if a.get("name", "").endswith(".apk")), None)}
+                                     if a.get("name", "").endswith(".apk")), None),
+                        "dmgs": {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])
+                                 if a.get("name", "").endswith(".dmg")}}
                     st["etag"] = h.get("ETag") or h.get("etag")
             except Exception as e:  # noqa: BLE001
                 diag(f"update check failed: {e}", "warn")
@@ -241,7 +250,7 @@ def check_update(current: str, force: bool = False) -> dict:
     version = (rel.get("tag") or "").lstrip("v")
     skip = get_settings().get("update_skip") or ""
     return {"current": current, "version": version, "available": bool(version) and _ver(version) > _ver(current),
-            "skipped": bool(skip) and skip == version, "apk": rel.get("apk"), "url": rel.get("url"),
+            "skipped": bool(skip) and skip == version, "apk": rel.get("apk"), "url": rel.get("url"), "dmg": _pick_dmg(rel.get("dmgs") or {}),
             "notes": rel.get("notes") or "", "checked": st.get("checked"), "repo": UPDATE_REPO}
 
 

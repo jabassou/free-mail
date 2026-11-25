@@ -40,6 +40,12 @@ Read, write and tidy up your mail in a clean, fast app with real notifications.
 
 ---
 
+## Install on macOS
+
+Download `FreeMail-v<version>-macos-<arch>.dmg` from the [latest release](https://github.com/jabassou/free-mail/releases/latest), drag **Free Mail** to Applications and open it. The app is not notarized: the first time, right-click > Open (or `xattr -dr com.apple.quarantine "/Applications/Free Mail.app"`). On first launch it asks for your Free address and password (stored in the macOS Keychain, never in a file).
+
+From the sources: `make app-install` builds the app and copies it to /Applications, `make app-dev` runs it without bundling. Your data (rules, filters, backups, reports) lives in `~/Library/Application Support/FreeMail`.
+
 ## Install on Android
 
 > Requires **Android 10 or newer** and a **Free mailbox** (`…@free.fr`).

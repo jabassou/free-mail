@@ -136,6 +136,12 @@ Server side in `extras.py` (shared by the desktop UI, Termux and the Android app
 - **Updates**: checks the latest GitHub release of `jabassou/free-mail` (fixed in `extras.UPDATE_REPO`) every 30 min and at app start, with conditional requests (ETag, no API quota used when nothing changed), cached in `update.json`. Each new version is announced once (notification + dialog: Update now / Later / Skip this version). Releases must be signed with the same key and the repository must stay public (unauthenticated GitHub API).
 - **Diagnostics**: own screen in the menu (version, IMAP/webmail/notifier state, Android delivery status, technical log) with Copy / Share.
 
+## macOS app
+
+`macapp.py` runs the same backend as `webui.py` (random port, per-run token) and shows the UI in a native window with pywebview (WKWebView). Code and `web/` stay read-only inside the bundle; data goes to `~/Library/Application Support/FreeMail` (`prepare_home`, `repoint`, same idea as the Android bridge) and the password to the Keychain. The first launch asks for the address and password with native dialogs (osascript) and tests the IMAP login before storing anything.
+
+`macos/build-app.sh` (`make app`) builds `dist-mac/Free Mail.app` with PyInstaller, ad-hoc signs it and packs `FreeMail-v<VERSION>-macos-<arch>.dmg`. The `macos` workflow does the same on a macOS runner for each `v*` tag and attaches the .dmg to the release created by `apk.yml` (it waits for it instead of racing). Without a Developer ID there is no notarization, so a downloaded copy needs right-click > Open once. The in-app update check offers the .dmg of the matching architecture. Not in the bundle: Playwright (browser login fallback) and background notifications.
+
 ## Android app (APK)
 
 Native Android app (`android/`, Kotlin + Chaquopy): the same Python backend runs inside the app on 127.0.0.1 (random port, per-install token) and the web UI is shown in a WebView. Android 10+ (minSdk 29), targetSdk 35.
