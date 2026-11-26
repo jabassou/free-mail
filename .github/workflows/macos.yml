@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-latest
     permissions:
       contents: write   # attach the .dmg to the release
     timeout-minutes: 30
