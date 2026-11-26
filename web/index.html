@@ -1390,8 +1390,8 @@ async function loadFilters(){
   catch(e){ const zl=e.data?.zimbra_login&&window.FMAndroid, wl=e.status===409&&!window.FMAndroid;
     $('#fTable').innerHTML='<div class="issue '+(e.status===409?'info':'error')+'">'+I(e.status===409?'info':'alert')+'<div>'+esc(e.message)+((zl||wl)?'<div style="margin-top:12px"><button class="btn primary" id="zLogin">'+I('zap','sm')+'Connexion au webmail Free</button><div class="small muted" id="zLoginMsg" style="margin-top:8px"></div></div>':'')+'</div></div>';
     if(zl) $('#zLogin').onclick=()=>FMAndroid.zimbraLogin();
-    else if(wl) $('#zLogin').onclick=async()=>{ const b=$('#zLogin'), m=$('#zLoginMsg'); b.disabled=true; m.textContent=L2('Connexion au webmail de Free…','Signing in to Free webmail…');
-      try{ const r=await api('login',{mode:'auto'}); SESSION=await api('session'); toast(L2(`Connecté au webmail · ${r.filters} filtres`,`Signed in to webmail · ${r.filters} filters`)); loadFilters(); }
+    else if(wl) $('#zLogin').onclick=async()=>{ const b=$('#zLogin'), m=$('#zLoginMsg'); b.disabled=true; m.textContent=SESSION.macapp?L2('Une fenêtre s’ouvre : connecte-toi au webmail de Free (elle se ferme toute seule).','A window opens: sign in to Free webmail (it closes by itself).'):L2('Connexion au webmail de Free…','Signing in to Free webmail…');
+      try{ const r=await api('login',{mode:SESSION.macapp?'window':'auto'}); SESSION=await api('session'); toast(L2(`Connecté au webmail · ${r.filters} filtres`,`Signed in to webmail · ${r.filters} filters`)); loadFilters(); }
       catch(err){ b.disabled=false; m.textContent=err.message; } }; }
 }
 function renderFilters(){
