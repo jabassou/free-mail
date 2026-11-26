@@ -157,3 +157,13 @@ def test_new_mail_view(server, imap):
     assert imap.find("INBOX", inbox)[0][1] is False
     server("mail/flag", {"folder": "Jobs/Alerts", "uids": r["marked"]["Jobs/Alerts"], "flag": "seen", "on": False})
     assert imap.find("Jobs/Alerts", alert)[0][1] is False
+
+
+def test_open_external_only_allows_the_project_releases(server, monkeypatch):
+    import webbrowser
+    opened = []
+    monkeypatch.setattr(webbrowser, "open", lambda u: opened.append(u) or True)
+    ok = "https://github.com/jabassou/free-mail/releases/download/v1/FreeMail.dmg"
+    assert server("open/external", {"url": ok})["ok"] is True
+    server("open/external", {"url": "https://evil.example/x"}, status=400)
+    assert opened == [ok]

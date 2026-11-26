@@ -1891,7 +1891,7 @@ async function openMsg(uid,remote=false){
   if(matchMedia('(max-width:860px)').matches){ $('#rBack').style.display='grid'; $('#rBack').onclick=closeReaderPane; }
   $$('[data-att]').forEach(b=>b.onclick=()=>downloadAtt(m,+b.dataset.att,b));
 }
-function openExt(url){ if(!url) return; if(window.FMAndroid) FMAndroid.openUrl(url); else window.open(url,'_blank','noopener,noreferrer'); }
+function openExt(url){ if(!url) return; if(window.FMAndroid) FMAndroid.openUrl(url); else if(SESSION.platform==='darwin') api('open/external',{url}).catch(()=>window.open(url,'_blank','noopener,noreferrer')); else window.open(url,'_blank','noopener,noreferrer'); }
 async function unsubscribe(m,btn){ const who=(m.from[0]?.name||m.from[0]?.email||'cet expéditeur');
   if(!confirm(`Se désabonner de ${who} ?`)) return; busy(btn,true,'');
   try{ const r=await api('mail/unsubscribe',{folder:m.folder,uid:m.uid});
