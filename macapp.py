@@ -124,6 +124,43 @@ def ensure_credentials(home: Path, fm, ask=ask, alert=alert) -> str | None:
         return user
 
 
+# --------------------------------------------------------------------------- webmail session
+def webmail_login_window(url: str, wv=None, timeout: float = 300.0, sleep=None) -> str | None:
+    """Open Free's webmail in a native window, wait until the user is signed in and return the Cookie header.
+
+    The login page needs JavaScript (no plain HTTP login) and the bundle has no Playwright: the WebView itself is the browser.
+    Returns None when the window is closed or the time runs out."""
+    import time
+    if wv is None:
+        import webview as wv  # noqa: PLC0415
+    sleep = sleep or time.sleep
+    closed = []
+    win = wv.create_window("Connexion au webmail Free", url, width=980, height=760)
+    win.events.closed += lambda *a: closed.append(1)
+    deadline = time.time() + timeout
+    while not closed and time.time() < deadline:
+        sleep(1)
+        try:
+            jar = {}
+            for c in win.get_cookies() or []:
+                for name, m in c.items():
+                    jar[name] = m.value
+        except Exception:  # noqa: BLE001  (page still loading)
+            continue
+        if jar.get("ZM_AUTH_TOKEN"):
+            try:
+                win.destroy()
+            except Exception:  # noqa: BLE001
+                pass
+            return "; ".join(f"{k}={v}" for k, v in jar.items())
+    if not closed:
+        try:
+            win.destroy()
+        except Exception:  # noqa: BLE001
+            pass
+    return None
+
+
 # --------------------------------------------------------------------------- main
 def main() -> int:
     prepare_home(SUPPORT)
@@ -134,6 +171,7 @@ def main() -> int:
         return 1
     webui.TOKEN = secrets.token_urlsafe(24)
     webui.STATE["macapp"] = True  # enables the in-app update (macupdate)
+    webui.STATE["webmail_window"] = webmail_login_window  # Filters page: sign in to the Zimbra webmail in a window
     try:  # fixed port: the web origin (hence the settings kept in localStorage: theme, sounds...) must not change between launches
         srv = webui.start_server(PORT, imap_session=True, notify="none")
     except OSError:  # busy (e.g. `make ui` running): fall back to any free port
