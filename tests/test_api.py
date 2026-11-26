@@ -167,3 +167,17 @@ def test_open_external_only_allows_the_project_releases(server, monkeypatch):
     assert server("open/external", {"url": ok})["ok"] is True
     server("open/external", {"url": "https://evil.example/x"}, status=400)
     assert opened == [ok]
+
+
+def test_mail_headers_summary_and_stays_unread(server, imap):
+    subject = imap.put(subject=f"headers {uuid.uuid4().hex[:6]}", X_ProXaD_SC="state=SPAM|score=250",
+                       Authentication_Results="mx.free.fr; spf=fail smtp.mailfrom=other.example; dkim=none; dmarc=fail",
+                       Return_Path="<bounce@other.example>", Reply_To="boss@elsewhere.example")
+    uid = _uid(server, "INBOX", subject)
+    r = server(f"mail/headers?folder=INBOX&uid={uid}")
+    assert r["auth"] == {"spf": "fail", "dkim": "none", "dmarc": "fail"}
+    assert any(h["name"].lower() == "x-proxad-sc" and "SPAM" in h["value"] for h in r["spam"])
+    assert r["domains"]["from"] == "example.com" and r["domains"]["return_path"] == "other.example"
+    assert {"return_path_differs", "reply_to_differs", "auth_failed"} <= set(r["notes"])
+    assert any(h["name"] == "Subject" for h in r["headers"])
+    assert imap.find("INBOX", subject)[0][1] is False, "reading headers must not mark the mail as read"
