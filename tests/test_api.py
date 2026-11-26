@@ -164,6 +164,6 @@ def test_open_external_only_allows_the_project_releases(server, monkeypatch):
     opened = []
     monkeypatch.setattr(webbrowser, "open", lambda u: opened.append(u) or True)
     ok = "https://github.com/jabassou/free-mail/releases/download/v1/FreeMail.dmg"
-    assert server("open-external", {"url": ok})["ok"] is True
-    server("open-external", {"url": "https://evil.example/x"}, status=400)
+    assert server("open/external", {"url": ok})["ok"] is True
+    server("open/external", {"url": "https://evil.example/x"}, status=400)
     assert opened == [ok]
