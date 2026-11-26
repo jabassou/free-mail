@@ -10,6 +10,8 @@ Read, write and tidy up your mail in a clean, fast app with real notifications.
 [![Latest release](https://img.shields.io/github/v/release/jabassou/free-mail?label=latest%20version&style=for-the-badge)](https://github.com/jabassou/free-mail/releases/latest)
 &nbsp;
 [![Download the APK](https://img.shields.io/badge/Download-Android%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/jabassou/free-mail/releases/latest)
+&nbsp;
+[![Download for macOS](https://img.shields.io/badge/Download-macOS%20app-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/jabassou/free-mail/releases/latest)
 
 <img src="docs/images/desktop.png" alt="Free Mail on a computer: folders, message list and an open email" width="900">
 
@@ -34,7 +36,7 @@ Read, write and tidy up your mail in a clean, fast app with real notifications.
 </tr>
 </table>
 
-**Also included:** a **New** view with the unread mail of every folder in one place · new-mail notifications with *Mark as read* and *Reply* buttons · snooze a mail until later · one-click unsubscribe · conversations view · fingerprint / face lock · English and French · works offline with the last mails you read.
+**Also included:** a **New** view with the unread mail of every folder in one place · new-mail notifications with *Mark as read* and *Reply* buttons · snooze a mail until later · mail opens in the reading pane without leaving **New** · **Report as phishing** (moves the mail to Spam and creates a server rule) · selectable sounds for received and sent mail · one-click unsubscribe · conversations view · fingerprint / face lock · English and French · works offline with the last mails you read.
 
 **Private by design:** the app talks directly to Free's servers. Your password is stored encrypted on your phone and never sent anywhere else. No account, no ads, no tracking.
 
@@ -44,7 +46,7 @@ Read, write and tidy up your mail in a clean, fast app with real notifications.
 
 Download `FreeMail-v<version>-macos-<arch>.dmg` from the [latest release](https://github.com/jabassou/free-mail/releases/latest), drag **Free Mail** to Applications and open it. The app is not notarized: the first time, right-click > Open (or `xattr -dr com.apple.quarantine "/Applications/Free Mail.app"`). On first launch it asks for your Free address and password (stored in the macOS Keychain, never in a file).
 
-From the sources: `make app-install` builds the app and copies it to /Applications, `make app-dev` runs it without bundling. Your data (rules, filters, backups, reports) lives in `~/Library/Application Support/FreeMail`.
+From the sources: `make app-install` builds the app and copies it to /Applications, `make app-dev` runs it without bundling. Your data (rules, filters, backups, reports) lives in `~/Library/Application Support/FreeMail`. `make start` first fast-forwards to `origin/main` when the tree is clean (`UPDATE=0 make start` to skip).
 
 ## Install on Android
 

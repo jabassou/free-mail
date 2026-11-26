@@ -111,9 +111,10 @@ source .venv/bin/activate
 `mailweb.py` turns the web UI into a full mail client:
 
 - folder tree with unread counts, drag & drop messages onto folders
-- **New** (top of the folder tree): unread mail of every folder, one collapsible block per folder (3 most recent, "Show N more" expands in place), periods Today / Since last visit / All, per-folder and global "Mark read" with undo; Sent, Drafts, Trash, Spam, the snooze folder and folders muted in Settings are left out (`/api/mail/new`, `/api/mail/new/read`, deep link `#new`). The "Folders" section of the tree can be collapsed (remembered on the device).
+- **New** (top of the folder tree): unread mail of every folder, one collapsible block per folder (3 most recent, "Show N more" expands in place), periods Today / Since last visit / All, per-folder and global "Mark read" with undo; Sent, Drafts, Trash, Spam, the snooze folder and folders muted in Settings are left out (`/api/mail/new`, `/api/mail/new/read`, deep link `#new`). Opening a mail shows it in the right reader pane and keeps the New view (`MB.rfolder` is the mail's real folder, `RF()` is used for every action, "Open folder" still jumps to it). The "Folders" section of the tree can be collapsed (remembered on the device).
 - message list: newest first (IMAP SORT), 50 per page with infinite scroll, search (sender/subject/recipient, accents via TEXT), filters (unread, flagged, attachments), multi-select bulk actions
 - reader: HTML rendered in a sandboxed iframe (no scripts, strict CSP), remote images blocked until allowed, inline `cid:` images, attachment download, one-click unsubscribe, "Filter" opens the filter wizard
+- **Report as phishing** (reader): moves the mail to Spam and offers a server rule built from the subject (`phishPattern`, `phishRuleDialog`, via the filters API)
 - actions: reply / reply all / forward, star, unread, move, delete (Trash; permanent when already in Trash)
 - compose: To/Cc/Bcc chips with autocomplete, attachments (20 MB), sent via `smtp.free.fr:465` (SSL) and copied to Sent
 - rich-text editor: bold/italic/underline/strike, color, heading, lists, quote, links (Cmd+K), clear formatting; pasted HTML is sanitized, pasted/dropped files become attachments; mail sent as HTML + plain-text alternative
@@ -134,13 +135,14 @@ Server side in `extras.py` (shared by the desktop UI, Termux and the Android app
 - **Phone gestures**: swipe right = archive (or read/unread when there is no Archive folder), left = trash, with 5 s "Undo"; pull down to refresh.
 - **Offline mode**: the service worker keeps the last lists, messages and conversations read and serves them when the mailbox is unreachable.
 - **Updates**: checks the latest GitHub release of `jabassou/free-mail` (fixed in `extras.UPDATE_REPO`) every 30 min and at app start, with conditional requests (ETag, no API quota used when nothing changed), cached in `update.json`. Each new version is announced once (notification + dialog: Update now / Later / Skip this version). Releases must be signed with the same key and the repository must stay public (unauthenticated GitHub API).
+- **Sounds**: selectable sound for received and for sent mail (Settings > Sounds, volume, preview), `localStorage` key `fm-notif`. Sounds are synthesized in the page (PCM events `t`/`s`/`n`, Web Audio with an `<audio>` fallback); received mail adds 1 s of Bluetooth pre-roll.
 - **Diagnostics**: own screen in the menu (version, IMAP/webmail/notifier state, Android delivery status, technical log) with Copy / Share.
 
 ## macOS app
 
 `macapp.py` runs the same backend as `webui.py` (random port, per-run token) and shows the UI in a native window with pywebview (WKWebView). Code and `web/` stay read-only inside the bundle; data goes to `~/Library/Application Support/FreeMail` (`prepare_home`, `repoint`, same idea as the Android bridge) and the password to the Keychain. The first launch asks for the address and password with native dialogs (osascript) and tests the IMAP login before storing anything.
 
-`macos/build-app.sh` (`make app`) builds `dist-mac/Free Mail.app` with PyInstaller, ad-hoc signs it and packs `FreeMail-v<VERSION>-macos-<arch>.dmg`. The `macos` workflow does the same on a macOS runner for each `v*` tag and attaches the .dmg to the release created by `apk.yml` (it waits for it instead of racing). Without a Developer ID there is no notarization, so a downloaded copy needs right-click > Open once. The in-app update check offers the .dmg of the matching architecture. Not in the bundle: Playwright (browser login fallback) and background notifications.
+`macos/build-app.sh` (`make app`) builds `dist-mac/Free Mail.app` with PyInstaller, ad-hoc signs it and packs `FreeMail-v<VERSION>-macos-<arch>.dmg`. The `macos` workflow does the same on a macOS runner for each `v*` tag and attaches the .dmg to the release created by `apk.yml` (it waits for it instead of racing). Without a Developer ID there is no notarization, so a downloaded copy needs right-click > Open once. The in-app update check offers the .dmg of the matching architecture (`extras._pick_dmg`). The app serves the UI on fixed port 8777 (random fallback) so `localStorage` survives restarts; the WebView profile is kept in `~/Library/Application Support/FreeMail/webview`. `make start` runs `self-update` first (fast-forward from `origin/main` only with a clean tree and the right repo; `UPDATE=0` skips). Not in the bundle: Playwright (browser login fallback) and background notifications.
 
 ## Android app (APK)
 
