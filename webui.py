@@ -639,7 +639,8 @@ class Handler(BaseHTTPRequestHandler):
     def api_get_session(self, a):
         return {"logged": bool(STATE["cookie"] or STATE.get("imap")), "user": cfg().get("user"), "version": APP_VERSION, "auto": bool(STATE.get("auto")),
                 "zimbra": bool(STATE["cookie"]), "browser_login": _has_playwright(), "notifier": STATE.get("notifier"),
-                "platform": "android" if STATE.get("android") else "termux" if IS_TERMUX else sys.platform}
+                "platform": "android" if STATE.get("android") else "termux" if IS_TERMUX else sys.platform,
+                "macapp": bool(STATE.get("macapp"))}
 
     def api_post_login(self, a):
         if a.get("mode") == "imap":
@@ -889,6 +890,20 @@ class Handler(BaseHTTPRequestHandler):
     def api_post_update_skip(self, a):
         extras.save_settings({"update_skip": a.get("version", "")})
         return {"ok": True, "skipped": extras.get_settings()["update_skip"]}
+
+    def api_post_update_install(self, a):
+        """macOS app only: download the release .dmg, swap the bundle and relaunch (no browser, so no quarantine flag)."""
+        if not STATE.get("macapp"):
+            raise ApiError(400, "Only available in the macOS app")
+        import macupdate
+        try:
+            r = macupdate.install(str(a.get("url", "")))
+        except ValueError as e:
+            raise ApiError(400, str(e)) from None
+        except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+            raise ApiError(502, f"{type(e).__name__}: {e}") from None
+        threading.Timer(1.0, lambda: os._exit(0)).start()  # the detached script waits for this exit, then swaps and relaunches
+        return r
 
     def api_post_open_external(self, a):
         """Open a release link in the default browser (the desktop app's WebView ignores window.open)."""
