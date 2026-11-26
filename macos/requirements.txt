@@ -1,3 +1,4 @@
 # build-time only (see macos/build-app.sh): the native window and the bundler
 pywebview>=5.4
 pyinstaller>=6.10
+certifi
