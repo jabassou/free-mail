@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -113,3 +114,56 @@ def test_use_certifi_points_openssl_at_the_bundle(monkeypatch):
     monkeypatch.delenv("SSL_CERT_FILE", raising=False)
     macapp._use_certifi()
     assert os.environ["SSL_CERT_FILE"] == certifi.where()
+
+
+class _Ev:
+    def __init__(self):
+        self.fns = []
+
+    def __iadd__(self, fn):
+        self.fns.append(fn)
+        return self
+
+
+class _Win:
+    def __init__(self, cookies_by_poll):
+        self.events = types.SimpleNamespace(closed=_Ev())
+        self.polls = list(cookies_by_poll)
+        self.destroyed = False
+
+    def get_cookies(self):
+        from http.cookies import SimpleCookie
+        jar = self.polls.pop(0) if self.polls else {}
+        out = []
+        for k, v in jar.items():
+            c = SimpleCookie()
+            c[k] = v
+            out.append(c)
+        return out
+
+    def destroy(self):
+        self.destroyed = True
+
+
+def _wv(win):
+    return types.SimpleNamespace(create_window=lambda *a, **k: win)
+
+
+def test_webmail_login_window_returns_the_cookie_once_signed_in():
+    win = _Win([{}, {"JSESSIONID": "x"}, {"JSESSIONID": "x", "ZM_AUTH_TOKEN": "tok"}])
+    got = macapp.webmail_login_window("https://zimbra.free.fr", wv=_wv(win), sleep=lambda s: None)
+    assert got == "JSESSIONID=x; ZM_AUTH_TOKEN=tok" and win.destroyed
+
+
+def test_webmail_login_window_gives_up_when_closed_or_timed_out():
+    win = _Win([{}])
+    win.events.closed.fns.clear()
+    seen = []
+    # the user closes the window: the closed handler fires during the first sleep
+    def sleep(s):
+        for fn in win.events.closed.fns:
+            fn()
+        seen.append(1)
+    assert macapp.webmail_login_window("https://zimbra.free.fr", wv=_wv(win), sleep=sleep) is None and seen
+    win2 = _Win([])
+    assert macapp.webmail_login_window("https://zimbra.free.fr", wv=_wv(win2), timeout=0, sleep=lambda s: None) is None and win2.destroyed

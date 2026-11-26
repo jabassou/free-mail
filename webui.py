@@ -668,6 +668,14 @@ class Handler(BaseHTTPRequestHandler):
                 raise ApiError(500, f"Webmail OK mais connexion IMAP impossible : {e}", {"logs": logs}) from None
             STATE.update(cookie=cookie, auto=True, imap=False, password=a.get("password") or None)
             return {"ok": True, "filters": n, "user": cfg()["user"], "logs": logs}
+        if a.get("mode") == "window":  # macOS app: sign in inside a native window (no Playwright in the bundle)
+            opener = STATE.get("webmail_window")
+            if not opener:
+                raise ApiError(400, "Connexion par fenêtre indisponible ici")
+            got = opener(cfg()["zimbra_url"])
+            if not got:
+                raise ApiError(400, "Connexion annulée : la fenêtre a été fermée avant la fin")
+            a = {"cookie": got}
         cookie = (a.get("cookie") or "").strip()
         if cookie.lower().startswith("cookie:"):
             cookie = cookie[7:].strip()
