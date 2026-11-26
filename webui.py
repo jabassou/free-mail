@@ -801,6 +801,9 @@ class Handler(BaseHTTPRequestHandler):
             seen_on_device(a["folder"], [a["uid"]])
         return m
 
+    def api_get_mail_headers(self, a):
+        return mail(lambda mb: mailweb.get_headers(mb, a["folder"], a["uid"]))
+
     def api_get_mail_att(self, a):
         data, ctype, fname = mail(lambda mb: mailweb.get_attachment(mb, a["folder"], a["uid"], int(a["part"])))
         return ("__binary__", data, ctype, fname)
