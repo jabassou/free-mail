@@ -2675,6 +2675,9 @@ function showUpdateState(){ const c=$('#sVerCur'), l=$('#sVerLast'); if(!c) retu
 function installUpdate(r){ closeUpdateDialog();
   if(window.FMAndroid&&FMAndroid.installUpdate&&r.apk){ let res='ok'; try{ res=FMAndroid.installUpdate(r.apk,r.version||''); }catch(e){ res=String(e); }
     res==='ok'?toast('Téléchargement de la mise à jour…'):toast(res,'err',8000); }
+  else if(SESSION.macapp&&r.dmg){ toast(L2('Téléchargement de la mise à jour…','Downloading the update…'),'',60000);
+    api('update/install',{url:r.dmg}).then(()=>toast(L2("Installation terminée : l'app redémarre…",'Installed: the app is restarting…'),'',20000))
+      .catch(e=>{ toast(L2('Mise à jour automatique impossible : ','Automatic update failed: ')+e.message,'err',8000); openExt(r.dmg); }); }
   else openExt((SESSION.platform==='darwin'&&r.dmg)||r.url||r.apk); }
 function closeUpdateDialog(){ document.querySelector('.upd-scrim')?.remove(); }
 function showUpdateDialog(r){ closeUpdateDialog(); UPD_SHOWN=true;

@@ -181,3 +181,7 @@ def test_mail_headers_summary_and_stays_unread(server, imap):
     assert {"return_path_differs", "reply_to_differs", "auth_failed"} <= set(r["notes"])
     assert any(h["name"] == "Subject" for h in r["headers"])
     assert imap.find("INBOX", subject)[0][1] is False, "reading headers must not mark the mail as read"
+
+
+def test_update_install_is_macos_app_only(server):
+    server("update/install", {"url": "https://github.com/jabassou/free-mail/releases/download/v1/a.dmg"}, status=400)
