@@ -133,6 +133,7 @@ def main() -> int:
     if not ensure_credentials(SUPPORT, fm):
         return 1
     webui.TOKEN = secrets.token_urlsafe(24)
+    webui.STATE["macapp"] = True  # enables the in-app update (macupdate)
     try:  # fixed port: the web origin (hence the settings kept in localStorage: theme, sounds...) must not change between launches
         srv = webui.start_server(PORT, imap_session=True, notify="none")
     except OSError:  # busy (e.g. `make ui` running): fall back to any free port

@@ -1387,9 +1387,12 @@ async function loadFilters(){
     $('#bkList').innerHTML=r.backups.length?r.backups.map(b=>`<option>${esc(b)}</option>`).join(''):'<option value="">Aucune sauvegarde</option>';
     if(!FOLDERS.length) FOLDERS=await api('folders');
     renderFilters(); }
-  catch(e){ const zl=e.data?.zimbra_login&&window.FMAndroid;
-    $('#fTable').innerHTML='<div class="issue '+(e.status===409?'info':'error')+'">'+I(e.status===409?'info':'alert')+'<div>'+esc(e.message)+(zl?'<div style="margin-top:12px"><button class="btn primary" id="zLogin">'+I('zap','sm')+'Connexion au webmail Free</button></div>':'')+'</div></div>';
-    if(zl) $('#zLogin').onclick=()=>FMAndroid.zimbraLogin(); }
+  catch(e){ const zl=e.data?.zimbra_login&&window.FMAndroid, wl=e.status===409&&!window.FMAndroid;
+    $('#fTable').innerHTML='<div class="issue '+(e.status===409?'info':'error')+'">'+I(e.status===409?'info':'alert')+'<div>'+esc(e.message)+((zl||wl)?'<div style="margin-top:12px"><button class="btn primary" id="zLogin">'+I('zap','sm')+'Connexion au webmail Free</button><div class="small muted" id="zLoginMsg" style="margin-top:8px"></div></div>':'')+'</div></div>';
+    if(zl) $('#zLogin').onclick=()=>FMAndroid.zimbraLogin();
+    else if(wl) $('#zLogin').onclick=async()=>{ const b=$('#zLogin'), m=$('#zLoginMsg'); b.disabled=true; m.textContent=L2('Connexion au webmail de Free…','Signing in to Free webmail…');
+      try{ const r=await api('login',{mode:'auto'}); SESSION=await api('session'); toast(L2(`Connecté au webmail · ${r.filters} filtres`,`Signed in to webmail · ${r.filters} filters`)); loadFilters(); }
+      catch(err){ b.disabled=false; m.textContent=err.message; } }; }
 }
 function renderFilters(){
   const q=$('#fSearch').value.toLowerCase();
@@ -2675,6 +2678,9 @@ function showUpdateState(){ const c=$('#sVerCur'), l=$('#sVerLast'); if(!c) retu
 function installUpdate(r){ closeUpdateDialog();
   if(window.FMAndroid&&FMAndroid.installUpdate&&r.apk){ let res='ok'; try{ res=FMAndroid.installUpdate(r.apk,r.version||''); }catch(e){ res=String(e); }
     res==='ok'?toast('Téléchargement de la mise à jour…'):toast(res,'err',8000); }
+  else if(SESSION.macapp&&r.dmg){ toast(L2('Téléchargement de la mise à jour…','Downloading the update…'),'',60000);
+    api('update/install',{url:r.dmg}).then(()=>toast(L2("Installation terminée : l'app redémarre…",'Installed: the app is restarting…'),'',20000))
+      .catch(e=>{ toast(L2('Mise à jour automatique impossible : ','Automatic update failed: ')+e.message,'err',8000); openExt(r.dmg); }); }
   else openExt((SESSION.platform==='darwin'&&r.dmg)||r.url||r.apk); }
 function closeUpdateDialog(){ document.querySelector('.upd-scrim')?.remove(); }
 function showUpdateDialog(r){ closeUpdateDialog(); UPD_SHOWN=true;
