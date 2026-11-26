@@ -800,6 +800,12 @@ body.newview #mList .search,body.newview #mFilters,body.newview #mThreads{displa
           <div class="small muted" style="margin-top:8px">« Instantané » garde une connexion ouverte (IMAP IDLE) : le mail est signalé en une seconde. 5 dossiers maximum, les autres sont vérifiés régulièrement.</div>
           <div class="fnot" id="sFolders"></div>
         </div>
+        <div class="card"><div class="card-h"><div class="chip-ic"><svg class="ic sm"><use href="#i-bell"/></svg></div><h3>Sons</h3></div>
+          <div class="set-row" style="border-top:0;padding-top:0"><div class="grow"><b>Sons activés</b><div class="d">Arrivée et envoi de mails (sur cet appareil)</div></div><label class="switch"><input type="checkbox" id="sSndOn"><span></span></label></div>
+          <div class="set-row"><div class="grow"><b>Mail reçu</b></div><select id="sSndRecv"></select><button class="iconbtn" id="sSndRecvT" title="Écouter"><svg class="ic sm"><use href="#i-play"/></svg></button></div>
+          <div class="set-row"><div class="grow"><b>Mail envoyé</b></div><select id="sSndSend"></select><button class="iconbtn" id="sSndSendT" title="Écouter"><svg class="ic sm"><use href="#i-play"/></svg></button></div>
+          <div class="set-row"><div class="grow"><b>Volume</b></div><input type="range" id="sSndVol" min="0" max="100" step="5" style="width:150px" aria-label="Volume"></div>
+        </div>
         <div class="card"><div class="card-h"><div class="chip-ic"><svg class="ic sm"><use href="#i-clock"/></svg></div><h3>Envois programmés</h3><span class="sp"></span><span class="badge" id="sSchedN"></span></div><div id="sSched"></div>
           <div class="card-h" style="margin-top:20px"><div class="chip-ic"><svg class="ic sm"><use href="#i-snooze"/></svg></div><h3>En attente</h3><span class="sp"></span><span class="badge" id="sSnzN"></span></div><div id="sSnz"></div></div>
         <div class="card"><div class="card-h"><div class="chip-ic"><svg class="ic sm"><use href="#i-shield"/></svg></div><h3>Application</h3><span class="sp"></span><span class="chip" id="sVer"></span></div>
@@ -918,6 +924,7 @@ body.newview #mList .search,body.newview #mFilters,body.newview #mThreads{displa
 
 <script>
 const I18N_EN={
+'Sons':'Sounds','Sons activés':'Sounds on','Arrivée et envoi de mails (sur cet appareil)':'Incoming and outgoing mail (this device)','Mail reçu':'Mail received','Mail envoyé':'Mail sent','Volume':'Volume','Écouter':'Play',
 'Signaler comme phishing':'Report as phishing','Bloquer les prochains mails ?':'Block future mails?','Message déplacé dans le Spam':'Message moved to Spam','Aucun dossier Spam trouvé':'No Spam folder found','Ce message est déjà dans le Spam':'This message is already in Spam','Créer une règle serveur : les mails similaires iront directement dans le Spam.':'Create a server rule: similar mails will go straight to Spam.','Le sujet contient':'Subject contains',"Sauf si l'expéditeur contient (optionnel)":'Unless the sender contains (optional)','Non merci':'No thanks','Créer la règle':'Create rule','Règle créée':'Rule created','Motif trop court':'Pattern too short',
 'Diagnostic':'Diagnostics',"État de l'appli, à joindre à un signalement de bug.":'App status, to attach to a bug report.','État':'Status','Copier':'Copy','Partager':'Share',
 'Rechercher une mise à jour':'Check for updates','Vérifiées automatiquement ; une notification signale chaque nouvelle version.':'Checked automatically; a notification announces every new version.',
@@ -2221,7 +2228,7 @@ async function sendMail(later){ $$('[data-rcpt] input').forEach(i=>i.blur()); ac
   if(later||delay) return sendQueued(later,delay);
   const b=$('#cSend'), c=CMP; busy(b,true,'Envoi…'); clearTimeout(c.t); c.sending=true;
   try{ if(c.saving) await c.saving; const r=await api('mail/send',cmpData());
-    hideCompose(); CMP={}; toast(`Message envoyé à ${r.recipients} destinataire(s)${r.saved_to_sent?'':' (copie dans Envoyés impossible)'}`);
+    hideCompose(); CMP={}; sendSound(); toast(`Message envoyé à ${r.recipients} destinataire(s)${r.saved_to_sent?'':' (copie dans Envoyés impossible)'}`);
     if(c.reply_uid){ const it=MB.items.find(x=>x.uid===c.reply_uid); if(it){ it.answered=true; renderRows(); } } refreshDrafts(); }
   catch(e){ c.sending=false; toast('Envoi impossible : '+e.message,'err',7000); } finally{ busy(b,false); } }
 $('#cSend').onclick=()=>sendMail();
@@ -2308,7 +2315,8 @@ document.addEventListener('keydown',e=>{
   else if(k==='h'){ const b=$('#rSnooze'); b&&whenMenu(b,'snooze',ts=>mSnooze(curUids(),ts)); }
 });
 /* ---- unread indicators, sound, desktop notifications */
-const NP=(()=>{try{return {sound:true,desktop:false,...JSON.parse(localStorage.getItem('fm-notif')||'{}')}}catch(e){return {sound:true,desktop:false}}})();
+const NP_DEF={sound:true,desktop:false,recv:'chime',send:'swish',vol:.8};
+const NP=(()=>{try{return {...NP_DEF,...JSON.parse(localStorage.getItem('fm-notif')||'{}')}}catch(e){return {...NP_DEF}}})();
 const saveNP=()=>{try{localStorage.setItem('fm-notif',JSON.stringify(NP))}catch(e){}};
 function notifPrefsHtml(){ return `<div class="fsec">Notifications</div>
   <label class="fitem" style="cursor:pointer"><span class="tw-btn"></span>${I('bell','sm')}<span class="lab">Son</span><span class="switch" style="transform:scale(.8)"><input type="checkbox" id="npSound" ${NP.sound?'checked':''}><span></span></span></label>
@@ -2322,41 +2330,67 @@ function wireNotifPrefs(){
     else NP.desktop=false; saveNP(); };
   t.onclick=()=>chime(true);
 }
-const CHIME_SR=24000, CHIME_LEAD=1.0;
-let CHIME_PCM=null, CHIME_URL=null, AC=null, AUDIO_OK=false;
-function chimePcm(){ if(CHIME_PCM) return CHIME_PCM; const n=Math.floor(CHIME_SR*.9), out=new Float32Array(n);
-  const notes=[[784,0],[1046.5,.12],[1568,.24]];
-  for(let i=0;i<n;i++){ const t=i/CHIME_SR; let v=0;
-    for(const [f,d] of notes){ const x=t-d; if(x>=0&&x<.62) v+=(Math.sin(2*Math.PI*f*x)+.25*Math.sin(4*Math.PI*f*x))*Math.min(1,x/.008)*Math.exp(-x*6); }
-    out[i]=v; }
-  let mx=0; for(const v of out) mx=Math.max(mx,Math.abs(v)); for(let i=0;i<n;i++) out[i]=out[i]/mx*.85;
-  /* Bluetooth headsets sleep when idle and drop the first ~0.5-1 s of audio: prepend an inaudible
-     pre-roll (low-level noise, not digital silence, so the link actually wakes up) */
-  const lead=Math.floor(CHIME_SR*CHIME_LEAD), all=new Float32Array(lead+n);
-  for(let i=0;i<lead;i++) all[i]=(Math.random()*2-1)*3e-4;
-  all.set(out,lead); return CHIME_PCM=all; }
-function chimeUrl(){ if(CHIME_URL) return CHIME_URL; const pcm=chimePcm(), n=pcm.length, b=new DataView(new ArrayBuffer(44+n*2));
+/* Sounds are synthesized (no audio files). Events: ['t',freq,at,decay,amp,harmonic,dur] tone, ['s',f0,f1,at,dur,amp] glide,
+   ['n',at,dur,amp,lowpass] noise. lead = inaudible pre-roll so Bluetooth headsets are awake (only for unattended arrivals). */
+const SND_SR=24000;
+const SOUNDS={
+  recv:{
+    chime:{fr:'Carillon',en:'Chime',len:.9,lead:1,ev:[['t',784,0,6],['t',1046.5,.12,6],['t',1568,.24,6]]},
+    drop:{fr:'Goutte',en:'Droplet',len:.5,lead:1,ev:[['t',1175,0,14,1,.15,.4],['t',1568,.09,16,.6,.1,.3]]},
+    bell:{fr:'Cloche',en:'Bell',len:1.3,lead:1,ev:[['t',523,0,3.2,1,0,1.2],['t',1443,0,5,.45,0,.9],['t',2824,0,9,.25,0,.6]]},
+    xylo:{fr:'Xylophone',en:'Xylophone',len:.8,lead:1,ev:[['t',784,0,9,1,.1],['t',988,.09,9,1,.1],['t',1175,.18,9,1,.1],['t',1568,.27,9,1,.1]]},
+    crystal:{fr:'Cristal',en:'Crystal',len:.9,lead:1,ev:[['t',1568,0,7,1,0],['t',2093,.08,7,.8,0],['t',2637,.16,6,.6,0]]},
+    soft:{fr:'Doux',en:'Soft',len:1,lead:1,ev:[['t',523,0,4,1,.05,.9],['t',659,.16,4,.9,.05,.9]]},
+    pop:{fr:'Pop',en:'Pop',len:.4,lead:1,ev:[['s',350,900,0,.07,1],['t',900,.07,20,.6,0,.2]]}},
+  send:{
+    swish:{fr:'Envol',en:'Swoosh',len:.5,lead:0,ev:[['s',500,1600,0,.22,.8],['t',1760,.2,12,.8,.1,.3]]},
+    whoosh:{fr:'Whoosh',en:'Whoosh',len:.5,lead:0,ev:[['n',0,.4,1,.35]]},
+    tick:{fr:'Clic',en:'Click',len:.2,lead:0,ev:[['n',0,.015,1,.6],['t',1800,0,60,.8,0,.08]]},
+    rise:{fr:'Pop montant',en:'Rising pop',len:.3,lead:0,ev:[['s',300,700,0,.09,1],['s',700,1100,.09,.09,1]]},
+    ding:{fr:'Ding',en:'Ding',len:.6,lead:0,ev:[['t',1319,0,8,1,.2,.5]]}}};
+const SND_CACHE=new Map();
+function sndEntry(kind,key){ const k=kind+':'+key; let e=SND_CACHE.get(k); if(e) return e; const d=SOUNDS[kind]&&SOUNDS[kind][key]; if(!d) return null;
+  const n=Math.floor(SND_SR*d.len), out=new Float32Array(n);
+  for(const ev of d.ev){
+    if(ev[0]==='t'){ const [,f,at,dec,amp=1,h=.25,dur=.62]=ev, i0=Math.floor(at*SND_SR), i1=Math.min(n,i0+Math.floor(dur*SND_SR));
+      for(let i=i0;i<i1;i++){ const x=(i-i0)/SND_SR; out[i]+=amp*(Math.sin(2*Math.PI*f*x)+h*Math.sin(4*Math.PI*f*x))*Math.min(1,x/.008)*Math.exp(-x*dec); } }
+    else if(ev[0]==='s'){ const [,f0,f1,at,dur,amp=1]=ev, i0=Math.floor(at*SND_SR), i1=Math.min(n,i0+Math.floor(dur*SND_SR));
+      for(let i=i0;i<i1;i++){ const x=(i-i0)/SND_SR; out[i]+=amp*Math.sin(2*Math.PI*(f0*x+(f1-f0)*x*x/(2*dur)))*Math.sin(Math.PI*x/dur); } }
+    else { const [,at,dur,amp=1,lp=.2]=ev, i0=Math.floor(at*SND_SR), i1=Math.min(n,i0+Math.floor(dur*SND_SR)); let y=0;
+      for(let i=i0;i<i1;i++){ const x=(i-i0)/SND_SR; y+=lp*(.5+1.5*x/dur)*(Math.random()*2-1-y); out[i]+=amp*3*y*Math.sin(Math.PI*x/dur); } } }
+  let mx=0; for(const v of out) mx=Math.max(mx,Math.abs(v)); if(mx>0) for(let i=0;i<n;i++) out[i]=out[i]/mx*.85;
+  const lead=Math.floor(SND_SR*(d.lead||0)), all=new Float32Array(lead+n);
+  for(let i=0;i<lead;i++) all[i]=(Math.random()*2-1)*3e-4;  /* low-level noise, not digital silence, so the Bluetooth link wakes up */
+  all.set(out,lead); e={pcm:all,url:null}; SND_CACHE.set(k,e); return e; }
+function sndUrl(kind,key){ const e=sndEntry(kind,key); if(!e) return null; if(e.url) return e.url; const pcm=e.pcm, n=pcm.length, b=new DataView(new ArrayBuffer(44+n*2));
   const w=(o,str)=>[...str].forEach((c,i)=>b.setUint8(o+i,c.charCodeAt(0)));
   w(0,'RIFF'); b.setUint32(4,36+n*2,true); w(8,'WAVEfmt '); b.setUint32(16,16,true); b.setUint16(20,1,true); b.setUint16(22,1,true);
-  b.setUint32(24,CHIME_SR,true); b.setUint32(28,CHIME_SR*2,true); b.setUint16(32,2,true); b.setUint16(34,16,true); w(36,'data'); b.setUint32(40,n*2,true);
+  b.setUint32(24,SND_SR,true); b.setUint32(28,SND_SR*2,true); b.setUint16(32,2,true); b.setUint16(34,16,true); w(36,'data'); b.setUint32(40,n*2,true);
   pcm.forEach((v,i)=>b.setInt16(44+i*2,v*32767,true));
-  return CHIME_URL=URL.createObjectURL(new Blob([b],{type:'audio/wav'})); }
+  return e.url=URL.createObjectURL(new Blob([b],{type:'audio/wav'})); }
+let AC=null, AUDIO_OK=false;
 /* AudioContext is only created inside a user gesture (Chrome autoplay policy) */
 function audioUnlock(){ try{ if(!AC){ const C=window.AudioContext||window.webkitAudioContext; if(C) AC=new C(); }
   if(AC&&AC.state!=='running') AC.resume().then(()=>{ AUDIO_OK=AC.state==='running'; }).catch(()=>{}); else if(AC) AUDIO_OK=true; }catch(e){} }
 ['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,audioUnlock,{passive:true,capture:true}));
-async function chimeWebAudio(){ if(!AC) return false; if(AC.state!=='running'){ try{ await AC.resume(); }catch(e){} } if(AC.state!=='running') return false;
-  const pcm=chimePcm(), buf=AC.createBuffer(1,pcm.length,CHIME_SR); buf.getChannelData(0).set(pcm);
-  const src=AC.createBufferSource(); src.buffer=buf; src.connect(AC.destination); src.start(); return true; }
-async function chimeElement(){ try{ const a=new Audio(chimeUrl()); a.volume=1; await a.play(); return true; }catch(e){ return false; } }
+const sndVol=()=>Math.max(0,Math.min(1,+NP.vol>=0?+NP.vol:.8));
+async function playSound(kind,key){ const e=!key||key==='off'?null:sndEntry(kind,key); if(!e) return null;
+  if(AC){ if(AC.state!=='running'){ try{ await AC.resume(); }catch(x){} }
+    if(AC.state==='running'){ const buf=AC.createBuffer(1,e.pcm.length,SND_SR); buf.getChannelData(0).set(e.pcm);
+      const src=AC.createBufferSource(), g=AC.createGain(); g.gain.value=sndVol(); src.buffer=buf; src.connect(g); g.connect(AC.destination); src.start(); return 'webaudio'; } }
+  try{ const a=new Audio(sndUrl(kind,key)); a.volume=sndVol(); await a.play(); return 'audio'; }catch(x){ return null; } }
+/* new mail: the sidebar "Test" button (manual) explains why nothing is heard */
 async function chime(manual){ if(!NP.sound&&!manual) return;
   if(manual) audioUnlock();
-  const how=(await chimeWebAudio())?'webaudio':(await chimeElement())?'audio':null;
+  const how=await playSound('recv',NP.recv);
   if(how) AUDIO_OK=true;
   if(manual){ if(how) toast('Son joué. Rien entendu ? Vérifie que l\'onglet n\'est pas en sourdine (clic droit sur l\'onglet), le réglage « Son » du site (icône à gauche de l\'URL) et le volume du Mac.');
     else toast('Le navigateur bloque le son : clique une fois dans la page puis réessaie','err'); }
-  else if(!how&&!AUDIO_OK) toast('Son bloqué par le navigateur : clique une fois dans la page pour l\'activer');
+  else if(!how&&!AUDIO_OK&&NP.recv!=='off') toast('Son bloqué par le navigateur : clique une fois dans la page pour l\'activer');
   return how; }
+const sendSound=()=>{ if(NP.sound) playSound('send',NP.send); };
+async function previewSound(kind,key){ audioUnlock(); if(!key||key==='off') return; const how=await playSound(kind,key);
+  if(!how) toast('Le navigateur bloque le son : clique une fois dans la page puis réessaie','err'); }
 function totalUnread(){ return MB.folders.filter(f=>!MUTE_ROLES.includes(f.role)&&f.name!==SNOOZE_FOLDER).reduce((a,f)=>a+(f.unseen||0),0); }
 function updateUnreadIndicators(){ const n=totalUnread();
   $$('.fitem.newf').forEach(b=>{ let p=b.querySelector('.pill'); if(!n){ p?.remove(); return; } if(!p){ p=document.createElement('span'); p.className='pill'; b.appendChild(p); } p.textContent=num(n); });
@@ -2440,7 +2474,7 @@ async function sendQueued(later,delay){
 function watchSend(id,c,delay){ let n=0;
   const chk=async()=>{ if(c.cancelled) return; n++; let it; try{ it=(await api('mail/scheduled')).items.find(x=>x.id===id); }catch(e){ return; }
     if(c.cancelled) return;
-    if(!it){ toast('Message envoyé'); if(c.reply_uid){ const x=MB.items.find(y=>y.uid===c.reply_uid); if(x){ x.answered=true; renderRows(); } } loadFolders(); return; }
+    if(!it){ sendSound(); toast('Message envoyé'); if(c.reply_uid){ const x=MB.items.find(y=>y.uid===c.reply_uid); if(x){ x.answered=true; renderRows(); } } loadFolders(); return; }
     if(it.error){ toast('Envoi impossible : '+it.error,'err',9000); return; }
     if(it.tries&&n===3) toast('Envoi impossible : '+(LANG==='fr'?'nouvel essai automatique':'retrying automatically'),'err');
     if(n<12) setTimeout(chk,2500); };
@@ -2521,8 +2555,18 @@ addEventListener('pagehide',()=>[...PENDING].forEach(f=>f()));
     else { p.style.opacity=0; p.style.transform=''; } },{passive:true}); })();
 
 /* ---- Settings tab */
+function wireSounds(){
+  const fill=(id,kind)=>{ const sel=$(id); sel.innerHTML=`<option value="off">${L2('Aucun','None')}</option>`+Object.entries(SOUNDS[kind]).map(([k,d])=>`<option value="${k}">${L2(d.fr,d.en)}</option>`).join(''); sel.value=NP[kind==='recv'?'recv':'send']||'off'; };
+  fill('#sSndRecv','recv'); fill('#sSndSend','send');
+  $('#sSndOn').checked=!!NP.sound; $('#sSndVol').value=String(Math.round(sndVol()*100));
+  $('#sSndOn').onchange=e=>{ NP.sound=e.target.checked; saveNP(); const m=$('#npSound'); if(m) m.checked=NP.sound; };
+  $('#sSndRecv').onchange=e=>{ NP.recv=e.target.value; saveNP(); previewSound('recv',NP.recv); };
+  $('#sSndSend').onchange=e=>{ NP.send=e.target.value; saveNP(); previewSound('send',NP.send); };
+  $('#sSndVol').onchange=e=>{ NP.vol=(+e.target.value)/100; saveNP(); previewSound('recv',NP.recv); };
+  $('#sSndRecvT').onclick=()=>previewSound('recv',$('#sSndRecv').value);
+  $('#sSndSendT').onclick=()=>previewSound('send',$('#sSndSend').value); }
 async function loadSettingsTab(){
-  await loadSettings();
+  await loadSettings(); wireSounds();
   $('#sName').value=SET.from_name||''; $('#sSig').innerHTML=SET.signature||''; $('#sUndo').value=String(SET.undo_seconds??8);
   $('#sQuiet').checked=!!SET.quiet?.on; $('#sQStart').value=SET.quiet?.start||'22:00'; $('#sQEnd').value=SET.quiet?.end||'07:00';
   $('#sQuietT').style.opacity=SET.quiet?.on?1:.5; showUpdateState(); $('#sVer').textContent=appVersion()||'';
@@ -2597,7 +2641,7 @@ function showUpdateState(){ const c=$('#sVerCur'), l=$('#sVerLast'); if(!c) retu
 function installUpdate(r){ closeUpdateDialog();
   if(window.FMAndroid&&FMAndroid.installUpdate&&r.apk){ let res='ok'; try{ res=FMAndroid.installUpdate(r.apk,r.version||''); }catch(e){ res=String(e); }
     res==='ok'?toast('Téléchargement de la mise à jour…'):toast(res,'err',8000); }
-  else openExt(r.url||r.apk); }
+  else openExt((SESSION.platform==='darwin'&&r.dmg)||r.url||r.apk); }
 function closeUpdateDialog(){ document.querySelector('.upd-scrim')?.remove(); }
 function showUpdateDialog(r){ closeUpdateDialog(); UPD_SHOWN=true;
   const d=document.createElement('div'); d.className='upd-scrim'; d.setAttribute('role','dialog'); d.setAttribute('aria-modal','true');
