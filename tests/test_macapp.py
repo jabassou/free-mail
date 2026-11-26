@@ -1,6 +1,7 @@
 """macapp.py: data directory and first-launch credentials (no window, no osascript, no network)."""
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -104,3 +105,11 @@ def test_update_check_picks_the_dmg_for_this_arch(monkeypatch):
     d = {"FreeMail-v1-macos-x86_64.dmg": "u-intel", "FreeMail-v1-macos-arm64.dmg": "u-arm"}
     assert extras._pick_dmg(d) == "u-arm"
     assert extras._pick_dmg({"x.dmg": "only"}) == "only" and extras._pick_dmg({}) is None
+
+
+def test_use_certifi_points_openssl_at_the_bundle(monkeypatch):
+    import certifi
+    import macapp
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    macapp._use_certifi()
+    assert os.environ["SSL_CERT_FILE"] == certifi.where()

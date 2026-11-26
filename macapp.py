@@ -21,6 +21,18 @@ from pathlib import Path
 
 import yaml
 
+
+def _use_certifi() -> None:
+    """The frozen Python has no system CA store: point OpenSSL at certifi's bundle."""
+    try:
+        import certifi
+    except ImportError:
+        return
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+
+
+_use_certifi()
+
 APP_NAME = "Free Mail"
 SUPPORT = Path.home() / "Library" / "Application Support" / "FreeMail"
 BUNDLE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))  # code + web/ (read-only when bundled)
