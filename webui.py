@@ -887,6 +887,14 @@ class Handler(BaseHTTPRequestHandler):
         extras.save_settings({"update_skip": a.get("version", "")})
         return {"ok": True, "skipped": extras.get_settings()["update_skip"]}
 
+    def api_post_open_external(self, a):
+        """Open a release link in the default browser (the desktop app's WebView ignores window.open)."""
+        url = str(a.get("url", ""))
+        if not url.startswith(f"https://github.com/{extras.UPDATE_REPO}/"):
+            raise ApiError(400, "URL not allowed")
+        webbrowser.open(url)
+        return {"ok": True}
+
     def api_post_mail_snooze(self, a):
         r = mail(lambda mb: extras.snooze(mb, a["folder"], a["uids"], a["until"]))
         seen_on_device(a["folder"], a["uids"])
