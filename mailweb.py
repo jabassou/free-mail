@@ -397,6 +397,57 @@ def _linkify(text: str) -> str:
     return '<div style="white-space:pre-wrap;font-family:-apple-system,Segoe UI,sans-serif;font-size:14px;line-height:1.55">' + "\n".join(lines) + "</div>"
 
 
+_SPAM_HEADERS = ("X-ProXaD-SC", "X-Spam-Flag", "X-Spam-Status", "X-Spam-Score", "X-Spam-Level", "X-Spam-Report")
+
+
+def _domain(addr: str) -> str:
+    m = re.search(r"@([A-Za-z0-9.-]+)", addr or "")
+    return m.group(1).lower() if m else ""
+
+
+def get_headers(mb: fm.Mailbox, folder: str, uid: str) -> dict:
+    """Raw headers of one message (never marks it as read) plus a summary: spam verdict, SPF/DKIM/DMARC, sender identities."""
+    mb.select(mb.resolve(folder), readonly=True)
+    typ, d = mb.M.uid("FETCH", uid, "(BODY.PEEK[HEADER])")
+    raw = next((it[1] for it in d or [] if isinstance(it, tuple)), None)
+    if raw is None:
+        raise MailError("Message introuvable (déjà déplacé ou supprimé ?)")
+    msg = email.message_from_bytes(raw, policy=email.policy.default)
+    headers = []
+    for k, v in msg.raw_items():
+        try:
+            val = str(v)
+        except Exception:  # noqa: BLE001
+            val = repr(v)
+        headers.append({"name": k, "value": re.sub(r"\s+", " ", val).strip()})
+
+    def first(name: str) -> str:
+        return next((h["value"] for h in headers if h["name"].lower() == name.lower()), "")
+
+    spam = [{"name": h["name"], "value": h["value"]} for h in headers if h["name"].lower() in {x.lower() for x in _SPAM_HEADERS}]
+    auth_txt = " ".join(h["value"] for h in headers if h["name"].lower() == "authentication-results")
+    auth = {}
+    for k in ("spf", "dkim", "dmarc"):
+        m = re.search(rf"\b{k}=([a-z]+)", auth_txt, re.I)
+        auth[k] = m.group(1).lower() if m else None
+    if auth["spf"] is None:
+        m = re.match(r"\s*([A-Za-z]+)", first("Received-SPF"))
+        auth["spf"] = m.group(1).lower() if m else None
+    if auth["dkim"] is None and any(h["name"].lower() == "dkim-signature" for h in headers):
+        auth["dkim"] = "signed"
+    ident = {"from": first("From"), "return_path": first("Return-Path"), "reply_to": first("Reply-To"), "sender": first("Sender")}
+    doms = {k: _domain(v) for k, v in ident.items()}
+    notes = []
+    if doms["from"] and doms["return_path"] and doms["from"].split(".")[-2:] != doms["return_path"].split(".")[-2:]:
+        notes.append("return_path_differs")
+    if doms["from"] and doms["reply_to"] and doms["from"].split(".")[-2:] != doms["reply_to"].split(".")[-2:]:
+        notes.append("reply_to_differs")
+    if any(v in ("fail", "softfail", "permerror") for v in auth.values() if v):
+        notes.append("auth_failed")
+    return {"headers": headers, "spam": spam, "auth": auth, "identity": ident, "domains": doms, "notes": notes,
+            "received": [h["value"] for h in headers if h["name"].lower() == "received"][-1:] }
+
+
 def get_message(mb: fm.Mailbox, folder: str, uid: str, mark_seen: bool = True) -> dict:
     raw_f = mb.resolve(folder)
     mb.select(raw_f, readonly=not mark_seen)
